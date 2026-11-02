@@ -1,0 +1,604 @@
+==========================================
+URBAN RIPPLE — PHASE 15
+ROUTE SECURITY INSPECTION
+==========================================
+
+1. MAIN API ROUTES
+from analytics.routes import router as analytics_router
+from disruption_management.routes import router as management_router
+from intelligence.predictions import router as intelligence_router
+from security.auth import router as auth_router
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from typing import Literal
+from datetime import datetime, timezone
+from uuid import uuid4
+import sqlite3
+from emergency.routes import router as emergency_router
+
+app = FastAPI(
+    title="URBAN RIPPLE API",
+    description="City Disruption Impact Prediction System",
+    version="1.0.0"
+)
+
+app.include_router(emergency_router)
+app.include_router(intelligence_router)
+
+app.include_router(auth_router)
+app.include_router(management_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Permanent SQLite database
+DATABASE = "urban_ripple.db"
+
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS disruptions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                disruption_type TEXT NOT NULL,
+                location TEXT NOT NULL,
+                latitude REAL,
+                longitude REAL,
+                duration_hours REAL NOT NULL,
+                affected_population INTEGER NOT NULL,
+                severity TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL
+            )
+        """)
+
+def row_to_dict(row):
+    return dict(row) if row else None
+
+init_db()
+
+
+class DisruptionCreate(BaseModel):
+    title: str = Field(min_length=3, max_length=150)
+    disruption_type: Literal[
+        "Road Closure", "Water Outage", "Power Outage"
+    ]
+    location: str = Field(min_length=2, max_length=200)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    duration_hours: float = Field(gt=0, le=720)
+    affected_population: int = Field(ge=0)
+    severity: Literal["Low", "Medium", "High", "Critical"]
+
+
+class ImpactRequest(BaseModel):
+    disruption_type: Literal[
+        "Road Closure", "Water Outage", "Power Outage"
+    ]
+    duration_hours: float = Field(gt=0, le=720)
+    affected_population: int = Field(ge=0)
+    severity: Literal["Low", "Medium", "High", "Critical"]
+
+
+@app.get("/")
+def home():
+    return {
+        "project": "URBAN RIPPLE",
+        "status": "Backend running",
+        "version": "1.0.0"
+    }
+
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+
+@app.get("/api/disruptions")
+def get_disruptions():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM disruptions ORDER BY created_at DESC"
+        ).fetchall()
+    records = [row_to_dict(row) for row in rows]
+    return {"count": len(records), "disruptions": records}
+
+@app.post("/api/disruptions", status_code=201)
+def create_disruption(data: DisruptionCreate):
+    record = data.model_dump()
+    record["id"] = str(uuid4())
+    record["created_at"] = datetime.now(timezone.utc).isoformat()
+    record["status"] = "Active"
+
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO disruptions (
+                id, title, disruption_type, location, latitude,
+                longitude, duration_hours, affected_population,
+                severity, created_at, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            record["id"], record["title"], record["disruption_type"],
+            record["location"], record["latitude"], record["longitude"],
+            record["duration_hours"], record["affected_population"],
+            record["severity"], record["created_at"], record["status"]
+        ))
+
+    return {
+        "message": "Disruption registered successfully",
+        "disruption": record
+    }
+
+@app.get("/api/disruptions/{disruption_id}")
+def get_disruption(disruption_id: str):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM disruptions WHERE id = ?",
+            (disruption_id,)
+        ).fetchone()
+
+    record = row_to_dict(row)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Disruption not found")
+    return record
+
+@app.post("/api/impact/analyze")
+def analyze_impact(data: ImpactRequest):
+    # Transparent demonstration formula, not a trained prediction model.
+    severity_weights = {
+        "Low": 1,
+        "Medium": 2,
+        "High": 3,
+        "Critical": 4
+    }
+
+    type_weights = {
+        "Road Closure": 1.0,
+        "Water Outage": 1.3,
+        "Power Outage": 1.5
+    }
+
+    raw_score = (
+        data.affected_population
+        * min(data.duration_hours, 72)
+        * severity_weights[data.severity]
+        * type_weights[data.disruption_type]
+    )
+
+    impact_score = round(
+        min(100, raw_score / 10000 * 100), 1
+    )
+
+    if impact_score < 25:
+        impact_level = "Low"
+    elif impact_score < 50:
+        impact_level = "Moderate"
+    elif impact_score < 75:
+        impact_level = "High"
+    else:
+        impact_level = "Severe"
+
+    recommendations = []
+
+    if data.severity in ["High", "Critical"]:
+        recommendations.append(
+            "Prioritise the disruption for immediate review by city authorities."
+        )
+
+    if data.affected_population >= 1000:
+        recommendations.append(
+            "Notify affected residents and coordinate alternative services."
+        )
+
+    if data.duration_hours >= 4:
+        recommendations.append(
+            "Prepare a continuity plan and provide periodic public updates."
+        )
+
+    if data.disruption_type == "Road Closure":
+        recommendations.append(
+            "Identify alternate routes and coordinate traffic management."
+        )
+    elif data.disruption_type == "Water Outage":
+        recommendations.append(
+            "Assess backup water supply and prioritise essential facilities."
+        )
+    elif data.disruption_type == "Power Outage":
+        recommendations.append(
+            "Prioritise critical infrastructure and assess backup power."
+        )
+
+    if not recommendations:
+        recommendations.append(
+            "Monitor the disruption and review conditions periodically."
+        )
+
+    return {
+        "impact_score": impact_score,
+        "impact_level": impact_level,
+        "disruption_type": data.disruption_type,
+        "duration_hours": data.duration_hours,
+        "affected_population": data.affected_population,
+        "severity": data.severity,
+        "recommendations": recommendations,
+        "method": "Demonstration rule-based formula",
+        "is_sap_rpt_prediction": False,
+        "notice": (
+            "This is a preliminary demonstration estimate, "
+            "not a validated prediction or SAP-RPT output."
+        )
+    }
+
+app.include_router(analytics_router)
+
+2. AUTHENTICATION ROUTES
+import os
+import sqlite3
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+
+import jwt
+from dotenv import load_dotenv
+from pwdlib import PasswordHash
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr, Field
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+DB_PATH = BASE_DIR / "urban_ripple.db"
+
+load_dotenv(BASE_DIR / ".env")
+
+SECRET_KEY = os.getenv("JWT_SECRET")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET is missing from backend/.env")
+
+password_hash = PasswordHash.recommended()
+security = HTTPBearer()
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_users_table():
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'public',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+
+init_users_table()
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+def create_token(user_id: int, email: str, role: str):
+    expiry = datetime.now(timezone.utc) + timedelta(hours=8)
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "role": role,
+        "exp": expiry
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        user_id = int(payload["sub"])
+    except (jwt.InvalidTokenError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    with get_connection() as conn:
+        user = conn.execute(
+            "SELECT id, name, email, role FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return dict(user)
+
+
+@router.post("/register", status_code=201)
+def register(data: RegisterRequest):
+    email = str(data.email).lower().strip()
+    hashed = password_hash.hash(data.password)
+
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute("""
+                INSERT INTO users (name, email, password_hash, role, created_at)
+                VALUES (?, ?, ?, 'public', ?)
+            """, (
+                data.name.strip(),
+                email,
+                hashed,
+                datetime.now(timezone.utc).isoformat()
+            ))
+            user_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    return {
+        "message": "Registration successful",
+        "user": {
+            "id": user_id,
+            "name": data.name.strip(),
+            "email": email,
+            "role": "public"
+        }
+    }
+
+
+@router.post("/login")
+def login(data: LoginRequest):
+    email = str(data.email).lower().strip()
+
+    with get_connection() as conn:
+        user = conn.execute(
+            "SELECT * FROM users WHERE email = ?",
+            (email,)
+        ).fetchone()
+
+    if user is None or not password_hash.verify(
+        data.password, user["password_hash"]
+    ):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_token(user["id"], user["email"], user["role"])
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "role": user["role"]
+        }
+    }
+
+
+@router.get("/me")
+def my_profile(user: dict = Depends(get_current_user)):
+    return {"user": user}
+
+3. ROLE AND PERMISSION DEFINITIONS
+from fastapi import Depends, HTTPException, status
+from security.auth import get_current_user
+
+ROLE_PERMISSIONS = {
+    "admin": {
+        "users:manage",
+        "departments:manage",
+        "disruptions:submit",
+        "disruptions:read",
+        "disruptions:read_public",
+        "disruptions:review",
+        "disruptions:assign",
+        "analytics:read",
+        "reports:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+        "audit:read",
+        "settings:manage",
+    },
+
+    "official": {
+        "disruptions:read",
+        "disruptions:review",
+        "disruptions:assign",
+        "analytics:read",
+        "reports:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+    },
+
+    "analyst": {
+        "disruptions:read",
+        "analytics:read",
+        "reports:read",
+    },
+
+    "emergency": {
+        "disruptions:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+    },
+
+    "public": {
+        "disruptions:submit",
+        "disruptions:read_public",
+    },
+}
+
+
+def require_roles(*allowed_roles):
+    def dependency(user=Depends(get_current_user)):
+        role = str(user.get("role", "public")).lower()
+
+        if role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your role is not permitted to perform this action."
+            )
+
+        return user
+
+    return dependency
+
+
+def require_permission(permission):
+    def dependency(user=Depends(get_current_user)):
+        role = str(user.get("role", "public")).lower()
+
+        if permission not in ROLE_PERMISSIONS.get(role, set()):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: {permission}"
+            )
+
+        return user
+
+    return dependency
+
+4. REGISTERED ROUTERS
+backend/venv/lib/python3.14/site-packages/fastapi/applications.py:1483:    def include_router(
+backend/venv/lib/python3.14/site-packages/fastapi/applications.py:1522:                app.include_router(
+backend/venv/lib/python3.14/site-packages/fastapi/applications.py:1563:                app.include_router(
+backend/venv/lib/python3.14/site-packages/fastapi/applications.py:1589:                app.include_router(
+backend/venv/lib/python3.14/site-packages/fastapi/applications.py:1617:                app.include_router(
+backend/venv/lib/python3.14/site-packages/fastapi/applications.py:1672:        app.include_router(users_router)
+backend/venv/lib/python3.14/site-packages/fastapi/applications.py:1675:        self.router.include_router(
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:2350:    app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:2770:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:3217:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:3238:    def include_router(
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:3369:        internal_router.include_router(users_router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:3370:        app.include_router(internal_router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:3774:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:4156:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:4538:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:4915:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:5292:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:5674:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:6056:        app.include_router(router)
+backend/venv/lib/python3.14/site-packages/fastapi/routing.py:6438:        app.include_router(router)
+backend/main.py:20:app.include_router(emergency_router)
+backend/main.py:21:app.include_router(intelligence_router)
+backend/main.py:23:app.include_router(auth_router)
+backend/main.py:24:app.include_router(management_router)
+backend/main.py:240:app.include_router(analytics_router)
+
+5. ROUTE PROTECTION DEPENDENCIES
+backend/security/auth.py:160:def my_profile(user: dict = Depends(get_current_user)):
+backend/security/roles.py:57:    def dependency(user=Depends(get_current_user)):
+backend/security/roles.py:72:    def dependency(user=Depends(get_current_user)):
+backend/security/permissions/dependencies.py:8:    def role_checker(current_user=Depends(get_current_user)):
+backend/security/permissions/dependencies.py:20:    def permission_checker(current_user=Depends(get_current_user)):
+backend/emergency/routes.py:72:    user=Depends(require_roles("admin", "official"))
+backend/emergency/routes.py:116:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/emergency/routes.py:135:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/emergency/routes.py:155:    user=Depends(require_roles("admin", "official"))
+backend/emergency/routes.py:205:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:64:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:118:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:128:    user=Depends(require_roles("admin", "official"))
+backend/disruption_management/routes.py:178:    user=Depends(require_roles("admin"))
+backend/analytics/routes.py:17:    user=Depends(require_roles("admin", "official", "analyst"))
+
+6. FRONTEND AUTHENTICATION SERVICES
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+export async function registerUser(data) {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Registration failed");
+  return result;
+}
+
+export async function loginUser(data) {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Login failed");
+  return result;
+}
+
+export async function getMyProfile(token) {
+  const response = await fetch(`${API_URL}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Session expired");
+  return result.user;
+}
+
+7. API BASE URL CONFIGURATION
+frontend/src/AppRouter.jsx:6:const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+frontend/src/App_before_analytics.jsx:73:        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+frontend/src/App_before_analytics.jsx:113:      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+frontend/src/App_before_analytics.jsx:174:      const response = await fetch("http://127.0.0.1:8000/api/impact/analyze", {
+frontend/src/auth/AuthScreen.jsx:3:const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+frontend/src/App_before_impact_ui.jsx:69:        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+frontend/src/App_before_impact_ui.jsx:109:      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+frontend/src/App_before_form_upgrade.jsx:43:        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+frontend/src/App_before_form_upgrade.jsx:80:      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+frontend/src/App_before_url_fix.jsx:73:        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+frontend/src/App_before_url_fix.jsx:113:      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+frontend/src/App_before_url_fix.jsx:174:      const response = await fetch("http://127.0.0.1:8000/api/impact/analyze", {
+frontend/src/App.jsx:83:        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+frontend/src/App.jsx:123:      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+frontend/src/App.jsx:184:      const response = await fetch("http://127.0.0.1:8000/api/impact/analyze", {
+frontend/src/App_before_live_map.jsx:50:        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+frontend/src/App_before_live_map.jsx:87:      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+frontend/src/modules/PredictiveIntelligence.jsx:9:const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/mlService.js:2:  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/emergencyService.js:2:  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/authService.js:1:const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/analyticsService.js:1:const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+==========================================
+PHASE 15 INSPECTION COMPLETE
+==========================================

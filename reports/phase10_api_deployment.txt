@@ -1,0 +1,103 @@
+==========================================
+URBAN RIPPLE — STEPS 741–840
+==========================================
+
+741–750: Backend environment
+Python environment OK
+Python 3.14.3
+No broken requirements found.
+
+751–760: Backend application
+Application imported successfully
+['GET', 'HEAD'] /openapi.json
+['GET', 'HEAD'] /docs
+['GET', 'HEAD'] /docs/oauth2-redirect
+['GET', 'HEAD'] /redoc
+['GET'] /
+['GET'] /health
+['GET'] /api/disruptions
+['POST'] /api/disruptions
+['GET'] /api/disruptions/{disruption_id}
+['POST'] /api/impact/analyze
+
+761–770: API health
+/Users/apple/Desktop/urban-ripple/backend/venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+/health 200
+/openapi.json 200
+
+771–780: Authentication protection
+/Users/apple/Desktop/urban-ripple/backend/venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+/api/analytics/overview Unauthenticated response: 401
+/api/emergency/incidents Unauthenticated response: 401
+
+781–790: Analytics implementation
+13:def get_analytics(start_date=None, end_date=None):
+17:    if start_date:
+19:        params.append(start_date)
+21:    if end_date:
+23:        params.append(end_date)
+79:        risk_summary = conn.execute(
+112:        "risk_summary": dict(risk_summary),
+114:            "start_date": start_date,
+115:            "end_date": end_date
+13:@router.get("/overview")
+14:def analytics_overview(
+
+791–800: Emergency implementation
+69:@router.post("/incidents", status_code=201)
+70:def create_incident(
+114:@router.get("/incidents")
+115:def list_incidents(
+132:@router.get("/incidents/{incident_id}")
+151:@router.patch("/incidents/{incident_id}")
+152:def update_incident(
+203:@router.get("/summary")
+204:def emergency_summary(
+
+801–810: Machine learning implementation
+backend/ml/__init__.py
+backend/ml/train.py
+
+811–820: Frontend API connectivity configuration
+frontend/src/services/mlService.js:2:  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/emergencyService.js:2:  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/authService.js:1:const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/analyticsService.js:1:const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+821–830: Deployment configuration review
+----- Dockerfile -----
+----- docker-compose.yml -----
+----- backend/Dockerfile -----
+----- frontend/Dockerfile -----
+
+831–840: Final frontend build
+
+> frontend@0.0.0 build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 2869 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          0.45 kB │ gzip:   0.29 kB
+dist/assets/index-C5WF3ZBA.css          33.20 kB │ gzip:  10.84 kB
+dist/assets/purify.es-Dqk5qvad.js       29.02 kB │ gzip:  11.45 kB
+dist/assets/index.es-Bpv0VaA1.js       151.37 kB │ gzip:  48.88 kB
+dist/assets/html2canvas-C63oUYN6.js    199.39 kB │ gzip:  46.73 kB
+dist/assets/index-C8VlKsJt.js        1,505.32 kB │ gzip: 464.54 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 332ms
+
+==========================================
+PHASE 10 COMPLETE
+Frontend build exit code: 0
+Report: reports/phase10_api_deployment.txt
+==========================================

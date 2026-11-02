@@ -1,0 +1,413 @@
+==========================================
+URBAN RIPPLE — STEPS 841–940
+FINAL APPLICATION INTEGRATION
+==========================================
+
+841–850: Create integration backup
+
+851–860: Inspect application entry points
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import "./modules/auth/Auth.css";
+import AppRouter from "./AppRouter.jsx";
+import { AuthProvider } from "./modules/auth/AuthContext";
+import AuthGate from "./modules/auth/AuthGate";
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <AuthProvider>
+      <AuthGate>
+        <AppRouter />
+      </AuthGate>
+    </AuthProvider>
+  </StrictMode>
+);
+import { useEffect, useState } from "react";
+import App from "./App.jsx";
+import AuthScreen from "./auth/AuthScreen.jsx";
+import RolePortal from "./portals/RolePortal.jsx";
+
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+export default function AppRouter() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifySession() {
+      const token = localStorage.getItem("urban_ripple_token");
+
+      if (!token) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Session expired");
+
+        const data = await response.json();
+        if (active) setUser(data.user);
+      } catch {
+        localStorage.removeItem("urban_ripple_token");
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    verifySession();
+    return () => { active = false; };
+  }, []);
+
+  function logout() {
+    localStorage.removeItem("urban_ripple_token");
+    setUser(null);
+    setWorkspace(false);
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40, fontFamily: "Arial" }}>Verifying session...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={setUser} />;
+  }
+
+  if (!workspace) {
+    return (
+      <RolePortal
+        user={user}
+        onOpenWorkspace={() => setWorkspace(true)}
+        onLogout={logout}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        padding: "10px 20px",
+        background: "#f1f1fa",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <span>Signed in: {user.name} ({user.role})</span>
+        <button onClick={() => setWorkspace(false)}>Portal</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+      <App />
+    </div>
+  );
+}
+
+861–870: Inspect main navigation
+    setImpactError("");
+    setImpactResult(null);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/impact/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          disruption_type: selected.disruptionType,
+          duration_hours: parseFloat(selected.duration),
+          affected_population: Number(selected.affectedPopulation || 0),
+          severity: selected.severity
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(JSON.stringify(result.detail || result));
+      }
+
+      setImpactResult(result);
+    } catch (error) {
+      setImpactError("Analysis failed: " + error.message);
+    } finally {
+      setImpactLoading(false);
+    }
+  }
+
+  const nav = [
+    { label: "Overview", icon: BarChart3 },
+    { label: "Disruptions", icon: AlertTriangle },
+    { label: "City Map", icon: MapPin },
+    { label: "Impact Analysis", icon: TrendingUp },
+    { label: "Predictive Intelligence", icon: Brain },
+
+    { label: "Analytics", icon: BarChart3 },
+    { label: "Predictive Insights", icon: TrendingUp },
+    { label: "Ripple Effects", icon: Activity },
+    { label: "Location Intelligence", icon: MapPin },
+    { label: "Recommendations", icon: ShieldCheck },
+    { label: "Reports", icon: Building2 },
+    { label: "SAP Integration", icon: Radio }
+  ];
+
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
+        <div className="brand">
+          <div className="brand-icon"><Activity size={24} /></div>
+          <div><h2>URBAN RIPPLE</h2><span>URBAN INTELLIGENCE</span></div>
+          <button className="mobile-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+        </div>
+
+        <p className="workspace-label">WORKSPACE</p>
+        <nav>
+          {nav.map(({ label, icon: Icon }) => (
+            <button key={label}
+              className={`nav-item ${page === label ? "nav-active" : ""}`}
+              onClick={() => { setPage(label); setMenuOpen(false); }}>
+              <Icon size={19} /> <span>{label}</span>
+              {label === "Disruptions" && <span className="nav-count">{events.length}</span>}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div className="system-card">
+            <div className="system-title"><span className="live-dot" /> SYSTEM STATUS</div>
+            <h4>Prototype running</h4>
+            <p>SAP-RPT prediction integration is pending.</p>
+          </div>
+          <div className="sidebar-footer">
+            <div className="avatar">UR</div>
+            <div><strong>Urban Analyst</strong><span>City Operations</span></div>
+          </div>
+        </div>
+      </aside>
+
+      {menuOpen && <button className="mobile-overlay" onClick={() => setMenuOpen(false)} />}
+
+      <main className="main-content">
+        <header className="topbar">
+          <div className="topbar-left">
+            <button className="menu-toggle" onClick={() => setMenuOpen(true)}><Menu size={21} /></button>
+            <div className="breadcrumb">Workspace <span>›</span> <strong>{page}</strong></div>
+          </div>
+          <div className="topbar-right">
+            <div className="live-status"><span className="live-dot" /> DEMO ENVIRONMENT</div>
+            <span className="top-date">BENGALURU · INDIA</span>
+          </div>
+
+871–880: Check dashboard integrations
+15:import PredictiveIntelligence from "./modules/PredictiveIntelligence.jsx";
+17:import Analytics from "./modules/Analytics";
+18:import PredictiveInsights from "./modules/PredictiveInsights";
+214:    { label: "Predictive Intelligence", icon: Brain },
+216:    { label: "Analytics", icon: BarChart3 },
+217:    { label: "Predictive Insights", icon: TrendingUp },
+492:          {page === "Predictive Intelligence" && <PredictiveIntelligence />}
+493:           {page === "Analytics" && <Analytics events={events} />}
+494:          {page === "Predictive Insights" && <PredictiveInsights events={events} />}
+
+881–890: Check frontend authentication integration
+frontend/src/main.jsx:6:import { AuthProvider } from "./modules/auth/AuthContext";
+frontend/src/main.jsx:7:import AuthGate from "./modules/auth/AuthGate";
+frontend/src/main.jsx:11:    <AuthProvider>
+frontend/src/main.jsx:12:      <AuthGate>
+frontend/src/main.jsx:14:      </AuthGate>
+frontend/src/main.jsx:15:    </AuthProvider>
+frontend/src/modules/auth/AuthContext.jsx:4:const AuthContext = createContext(null);
+frontend/src/modules/auth/AuthContext.jsx:6:export function AuthProvider({ children }) {
+frontend/src/modules/auth/AuthContext.jsx:37:    <AuthContext.Provider value={{ user, loading, login, logout }}>
+frontend/src/modules/auth/AuthContext.jsx:39:    </AuthContext.Provider>
+frontend/src/modules/auth/AuthContext.jsx:44:  const context = useContext(AuthContext);
+frontend/src/modules/auth/AuthContext.jsx:45:  if (!context) throw new Error("useAuth must be inside AuthProvider");
+frontend/src/modules/auth/AuthGate.jsx:1:import { useAuth } from "./AuthContext";
+frontend/src/modules/auth/AuthGate.jsx:4:export default function AuthGate({ children }) {
+frontend/src/modules/auth/Login.jsx:2:import { useAuth } from "./AuthContext";
+
+891–900: Check role-based UI
+frontend/src/modules/auth/ForgotPassword.jsx:11:          Please contact your system administrator for assistance.
+frontend/src/modules/RippleEffects.jsx:4:    "Public transport delays",
+frontend/src/modules/RecommendationEngine.jsx:49:        instructions. Follow official authority directions.
+frontend/src/modules/RolePortals.jsx:4:  admin: {
+frontend/src/modules/RolePortals.jsx:5:    title: "Admin Portal",
+frontend/src/modules/RolePortals.jsx:9:  official: {
+frontend/src/modules/RolePortals.jsx:10:    title: "Official Portal",
+frontend/src/modules/RolePortals.jsx:14:  analyst: {
+frontend/src/modules/RolePortals.jsx:15:    title: "Analyst Portal",
+frontend/src/modules/RolePortals.jsx:19:  public: {
+frontend/src/modules/RolePortals.jsx:20:    title: "Public Portal",
+frontend/src/modules/RolePortals.jsx:21:    description: "Submit disruption reports and view permitted public updates.",
+frontend/src/modules/RolePortals.jsx:22:    modules: ["Report a Disruption", "My Reports", "Public Alerts"]
+frontend/src/modules/RolePortals.jsx:26:export default function RolePortals({ role = "public" }) {
+frontend/src/modules/RolePortals.jsx:28:  const portal = portalConfig[normalizedRole] || portalConfig.public;
+frontend/src/modules/SAPIntegration.jsx:7:  ["06", "Decision Support", "Display results for analyst review"]
+frontend/src/portals/RolePortal.jsx:2:  admin: {
+frontend/src/portals/RolePortal.jsx:3:    title: "Administrator Portal",
+frontend/src/portals/RolePortal.jsx:7:  official: {
+frontend/src/portals/RolePortal.jsx:8:    title: "Government Official Portal",
+frontend/src/portals/RolePortal.jsx:12:  analyst: {
+frontend/src/portals/RolePortal.jsx:13:    title: "City Analyst Portal",
+frontend/src/portals/RolePortal.jsx:22:  public: {
+frontend/src/portals/RolePortal.jsx:24:    description: "Submit disruption reports and explore public city information.",
+frontend/src/portals/RolePortal.jsx:25:    modules: ["Report a Disruption", "Track Reports", "City Map", "Public Alerts"]
+frontend/src/portals/RolePortal.jsx:30:  const role = String(user.role || "public").toLowerCase();
+frontend/src/portals/RolePortal.jsx:31:  const portal = portals[role] || portals.public;
+
+901–910: Check map dependencies
+16:    "leaflet": "^1.9.4",
+21:    "react-leaflet": "^5.0.0",
+frontend/src/App_before_analytics.jsx:13:import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+frontend/src/App_before_analytics.jsx:31:  const map = useMap();
+frontend/src/App_before_analytics.jsx:340:            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">\n              <MapAutoFit events={events} />
+frontend/src/App_before_analytics.jsx:341:              <TileLayer
+frontend/src/App_before_analytics.jsx:377:            </MapContainer>
+frontend/src/App_before_impact_ui.jsx:13:import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+frontend/src/App_before_impact_ui.jsx:31:  const map = useMap();
+frontend/src/App_before_impact_ui.jsx:296:            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">\n              <MapAutoFit events={events} />
+frontend/src/App_before_impact_ui.jsx:297:              <TileLayer
+frontend/src/App_before_impact_ui.jsx:333:            </MapContainer>
+frontend/src/App_backup.jsx:13:import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+frontend/src/App_backup.jsx:193:            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">
+frontend/src/App_backup.jsx:194:              <TileLayer
+frontend/src/App_backup.jsx:215:            </MapContainer>
+frontend/src/App_backup.jsx:216:            <p className="chart-disclaimer">Markers are illustrative and do not indicate verified road closures or live traffic conditions.</p>
+frontend/src/App_before_form_upgrade.jsx:13:import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+frontend/src/App_before_form_upgrade.jsx:255:            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">
+frontend/src/App_before_form_upgrade.jsx:256:              <TileLayer
+frontend/src/App_before_form_upgrade.jsx:277:            </MapContainer>
+frontend/src/App_before_form_upgrade.jsx:278:            <p className="chart-disclaimer">Markers are illustrative and do not indicate verified road closures or live traffic conditions.</p>
+frontend/src/App_before_url_fix.jsx:13:import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+frontend/src/App_before_url_fix.jsx:31:  const map = useMap();
+frontend/src/App_before_url_fix.jsx:340:            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">\n              <MapAutoFit events={events} />
+frontend/src/App_before_url_fix.jsx:341:              <TileLayer
+frontend/src/App_before_url_fix.jsx:377:            </MapContainer>
+frontend/src/App.jsx:13:import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+frontend/src/App.jsx:41:  const map = useMap();
+frontend/src/App.jsx:359:            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">\n              <MapAutoFit events={events} />
+frontend/src/App.jsx:360:              <TileLayer
+frontend/src/App.jsx:396:            </MapContainer>
+frontend/src/App_before_live_map.jsx:13:import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+frontend/src/App_before_live_map.jsx:271:            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">
+frontend/src/App_before_live_map.jsx:272:              <TileLayer
+frontend/src/App_before_live_map.jsx:293:            </MapContainer>
+frontend/src/App_before_live_map.jsx:294:            <p className="chart-disclaimer">Markers are illustrative and do not indicate verified road closures or live traffic conditions.</p>
+
+911–920: Check emergency and analytics services
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+async function request(endpoint, options = {}) {
+  const token = sessionStorage.getItem("urban_ripple_token");
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.detail || `API error: ${response.status}`);
+  }
+
+  return data;
+}
+
+export const getEmergencyIncidents = () =>
+  request("/api/emergency/incidents");
+
+export const getEmergencySummary = () =>
+  request("/api/emergency/summary");
+
+export const createEmergencyIncident = (incident) =>
+  request("/api/emergency/incidents", {
+    method: "POST",
+    body: JSON.stringify(incident),
+  });
+
+export const updateEmergencyIncident = (id, changes) =>
+  request(`/api/emergency/incidents/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+export async function getAnalyticsOverview(startDate = "", endDate = "") {
+  const token = sessionStorage.getItem("urban_ripple_token");
+
+  const params = new URLSearchParams();
+
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+
+  const query = params.toString();
+  const url = `${API_URL}/api/analytics/overview${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.detail || `Analytics request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+921–930: Check backend API routes
+Application: URBAN RIPPLE API
+GET,HEAD /openapi.json
+GET,HEAD /docs
+GET,HEAD /docs/oauth2-redirect
+GET,HEAD /redoc
+GET /
+GET /health
+GET /api/disruptions
+POST /api/disruptions
+GET /api/disruptions/{disruption_id}
+POST /api/impact/analyze
+
+931–940: Production build
+
+> frontend@0.0.0 build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 2869 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          0.45 kB │ gzip:   0.29 kB
+dist/assets/index-C5WF3ZBA.css          33.20 kB │ gzip:  10.84 kB
+dist/assets/purify.es-Dqk5qvad.js       29.02 kB │ gzip:  11.45 kB
+dist/assets/index.es-Bpv0VaA1.js       151.37 kB │ gzip:  48.88 kB
+dist/assets/html2canvas-C63oUYN6.js    199.39 kB │ gzip:  46.73 kB
+dist/assets/index-C8VlKsJt.js        1,505.32 kB │ gzip: 464.54 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 411ms
+
+==========================================
+PHASE 11 FINISHED
+Frontend build exit code: 0
+Report: reports/phase11_integration.txt
+Backups: backups/phase_11
+No existing application source files were overwritten.
+==========================================

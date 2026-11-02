@@ -1,0 +1,1274 @@
+==========================================
+URBAN RIPPLE — PART 2 DASHBOARD AUDIT
+Sun Nov  1 11:53:55 IST 2026
+==========================================
+
+========== 1. MAIN DASHBOARD ==========
+import { useState, useEffect } from "react";
+import {
+  Activity, AlertTriangle, BarChart3, Brain, Building2, Clock,
+  MapPin, Menu, Navigation, Plus, Radio, ShieldCheck,
+  TrendingUp, X
+} from "lucide-react";
+import {
+  Area, AreaChart, CartesianGrid, ResponsiveContainer,
+  Tooltip, XAxis, YAxis
+} from "recharts";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+import "./App.css";
+import PredictiveIntelligence from "./modules/PredictiveIntelligence.jsx";
+import { API_BASE_URL, apiFetch } from "./services/api.js";
+
+import Analytics from "./modules/Analytics";
+import PredictiveInsights from "./modules/PredictiveInsights";
+import RippleEffects from "./modules/RippleEffects";
+import LocationIntelligence from "./modules/LocationIntelligence";
+import RecommendationEngine from "./modules/RecommendationEngine";
+import Reports from "./modules/Reports";
+import SAPIntegration from "./modules/SAPIntegration";
+
+
+const initialEvents = [
+  { id: 1, name: "MG Road", area: "Central Business District", duration: "4 hours", severity: "High", status: "Active" },
+  { id: 2, name: "Brigade Road", area: "Commercial District", duration: "2 hours", severity: "Medium", status: "Monitoring" },
+  { id: 3, name: "Outer Ring Road", area: "Technology Corridor", duration: "6 hours", severity: "High", status: "Planned" }
+];
+
+const chartData = [
+  { time: "06 AM", impact: 12 }, { time: "08 AM", impact: 28 },
+  { time: "10 AM", impact: 46 }, { time: "12 PM", impact: 38 },
+  { time: "02 PM", impact: 61 }, { time: "04 PM", impact: 78 },
+  { time: "06 PM", impact: 92 }, { time: "08 PM", impact: 54 }
+];
+
+
+function MapAutoFit({ events }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const locations = events
+      .filter(event => event.latitude != null && event.longitude != null)
+      .map(event => [Number(event.latitude), Number(event.longitude)]);
+
+    if (locations.length === 1) {
+      map.setView(locations[0], 14);
+    } else if (locations.length > 1) {
+      map.fitBounds(locations, { padding: [40, 40], maxZoom: 14 });
+    }
+  }, [events, map]);
+
+  return null;
+}
+
+export default function App() {
+  const [events, setEvents] = useState([]);
+  const [page, setPage] = useState("Overview");
+  const [showForm, setShowForm] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedImpactId, setSelectedImpactId] = useState("");
+  const [impactResult, setImpactResult] = useState(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactError, setImpactError] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    area: "",
+    disruptionType: "Road Closure",
+    latitude: "",
+    longitude: "",
+    duration: "2 hours",
+    population: "0",
+    severity: "Medium"
+  });
+
+  const activeCount = events.filter(e => e.status === "Active").length;
+
+  useEffect(() => {
+    async function loadDisruptions() {
+      try {
+        const response = await apiFetch("/api/disruptions");
+        if (!response.ok) throw new Error("Could not load disruptions");
+
+        const data = await response.json();
+
+        setEvents(data.disruptions.map(record => ({
+          id: record.id,
+          name: record.title,
+          area: record.location,
+          duration: `${record.duration_hours} hours`,
+          severity: record.severity,
+          status: record.status,
+          disruptionType: record.disruption_type,
+          latitude: record.latitude,
+          longitude: record.longitude,
+          affectedPopulation: record.affected_population
+        })));
+      } catch (error) {
+        console.error("Backend loading error:", error);
+      }
+    }
+
+    loadDisruptions();
+  }, []);
+
+  async function addEvent(e) {
+    e.preventDefault();
+
+    const payload = {
+      title: form.name,
+      disruption_type: form.disruptionType,
+      location: form.area,
+      latitude: form.latitude === "" ? null : Number(form.latitude),
+      longitude: form.longitude === "" ? null : Number(form.longitude),
+      duration_hours: parseFloat(form.duration),
+      affected_population: Number(form.population),
+      severity: form.severity
+    };
+
+    try {
+      const response = await apiFetch("/api/disruptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(JSON.stringify(result.detail || result));
+      }
+
+      const record = result.disruption;
+
+      setEvents(old => [{
+        id: record.id,
+        name: record.title,
+        area: record.location,
+        duration: `${record.duration_hours} hours`,
+        severity: record.severity,
+        status: record.status,
+        disruptionType: record.disruption_type,
+          latitude: record.latitude,
+          longitude: record.longitude,
+          affectedPopulation: record.affected_population
+      }, ...old]);
+
+      setForm({
+        name: "",
+        area: "",
+        disruptionType: "Road Closure",
+        latitude: "",
+        longitude: "",
+        duration: "2 hours",
+        population: "0",
+        severity: "Medium"
+      });
+      setShowForm(false);
+      setPage("Disruptions");
+
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("Could not save disruption. Check whether the backend is running. " + error.message);
+    }
+  }
+
+  async function runImpactAnalysis() {
+    const selected = events.find(
+      event => String(event.id) === String(selectedImpactId)
+    );
+
+    if (!selected) {
+      setImpactError("Please select a disruption first.");
+      return;
+    }
+
+    setImpactLoading(true);
+    setImpactError("");
+    setImpactResult(null);
+
+    try {
+      const response = await apiFetch("/api/impact/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          disruption_type: selected.disruptionType,
+          duration_hours: parseFloat(selected.duration),
+          affected_population: Number(selected.affectedPopulation || 0),
+          severity: selected.severity
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(JSON.stringify(result.detail || result));
+      }
+
+      setImpactResult(result);
+    } catch (error) {
+      setImpactError("Analysis failed: " + error.message);
+    } finally {
+      setImpactLoading(false);
+    }
+  }
+
+  const nav = [
+    { label: "Overview", icon: BarChart3 },
+    { label: "Disruptions", icon: AlertTriangle },
+    { label: "City Map", icon: MapPin },
+    { label: "Impact Analysis", icon: TrendingUp },
+    { label: "Predictive Intelligence", icon: Brain },
+
+    { label: "Analytics", icon: BarChart3 },
+    { label: "Predictive Insights", icon: TrendingUp },
+    { label: "Ripple Effects", icon: Activity },
+    { label: "Location Intelligence", icon: MapPin },
+    { label: "Recommendations", icon: ShieldCheck },
+    { label: "Reports", icon: Building2 },
+    { label: "SAP Integration", icon: Radio }
+  ];
+
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
+        <div className="brand">
+          <div className="brand-icon"><Activity size={24} /></div>
+          <div><h2>URBAN RIPPLE</h2><span>URBAN INTELLIGENCE</span></div>
+          <button className="mobile-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+        </div>
+
+        <p className="workspace-label">WORKSPACE</p>
+        <nav>
+          {nav.map(({ label, icon: Icon }) => (
+            <button key={label}
+              className={`nav-item ${page === label ? "nav-active" : ""}`}
+              onClick={() => { setPage(label); setMenuOpen(false); }}>
+              <Icon size={19} /> <span>{label}</span>
+              {label === "Disruptions" && <span className="nav-count">{events.length}</span>}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div className="system-card">
+            <div className="system-title"><span className="live-dot" /> SYSTEM STATUS</div>
+            <h4>Prototype running</h4>
+            <p>SAP-RPT prediction integration is pending.</p>
+          </div>
+          <div className="sidebar-footer">
+            <div className="avatar">UR</div>
+            <div><strong>Urban Analyst</strong><span>City Operations</span></div>
+          </div>
+        </div>
+      </aside>
+
+      {menuOpen && <button className="mobile-overlay" onClick={() => setMenuOpen(false)} />}
+
+      <main className="main-content">
+        <header className="topbar">
+          <div className="topbar-left">
+            <button className="menu-toggle" onClick={() => setMenuOpen(true)}><Menu size={21} /></button>
+            <div className="breadcrumb">Workspace <span>›</span> <strong>{page}</strong></div>
+          </div>
+          <div className="topbar-right">
+            <div className="live-status"><span className="live-dot" /> DEMO ENVIRONMENT</div>
+            <span className="top-date">BENGALURU · INDIA</span>
+          </div>
+        </header>
+
+        <div className="page-container">
+          <section className="welcome-row">
+            <div>
+              <div className="eyebrow"><Radio size={15} /> CITY DISRUPTION INTELLIGENCE</div>
+              <h1>{page === "Overview" ? "City Overview" : page}</h1>
+              <p className="page-subtitle">Understand disruption patterns. Anticipate urban consequences.</p>
+            </div>
+            <button className="primary-button" onClick={() => setShowForm(true)}>
+              <Plus size={18} /> New Disruption
+            </button>
+          </section>
+
+          <section className="notice-banner">
+            <div className="notice-icon"><ShieldCheck size={21} /></div>
+            <div><strong>Demonstration mode</strong>
+              <p>Sample data is displayed. Real predictions are not yet connected to SAP-RPT.</p>
+            </div>
+          </section>
+
+          {page === "Overview" && <>
+            <section className="metrics-grid">
+              <Metric title="Tracked disruptions" value={events.length} caption="Events in this demo" icon={<Activity size={20} />} color="purple" />
+              <Metric title="Active disruptions" value={activeCount} caption="Currently marked active" icon={<AlertTriangle size={20} />} color="orange" />
+              <Metric title="Road segments" value="12" caption="Illustrative sample count" icon={<Navigation size={20} />} color="blue" />
+              <Metric title="Model connection" value="Pending" caption="SAP-RPT not connected" icon={<ShieldCheck size={20} />} color="green" />
+            </section>
+
+            <section className="content-grid">
+              <article className="panel">
+                <div className="panel-heading">
+                  <div><h3>Illustrative Impact Trend</h3><p>Example index across a typical day</p></div>
+                  <span className="chart-tag">SAMPLE DATA</span>
+                </div>
+                <div className="chart-area">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 15, right: 8, left: -20, bottom: 0 }}>
+                      <defs><linearGradient id="impactFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#5957cb" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="#5957cb" stopOpacity={0.01} />
+                      </linearGradient></defs>
+                      <CartesianGrid stroke="#ececf3" strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: "#85859a", fontSize: 11 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: "#85859a", fontSize: 11 }} />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="impact" stroke="#5957cb" strokeWidth={3} fill="url(#impactFill)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="chart-disclaimer">Illustrative only—not measured or model-predicted traffic impact.</p>
+              </article>
+
+              <article className="panel response-panel">
+                <div className="panel-heading"><div><h3>Operational Snapshot</h3><p>Current demo environment</p></div><Building2 size={20} /></div>
+                <Snapshot icon={<Clock size={18} />} title="Disruption duration" text="Varies by recorded event" />
+                <Snapshot icon={<MapPin size={18} />} title="Geographic coverage" text="Bengaluru sample locations" />
+                <Snapshot icon={<TrendingUp size={18} />} title="Impact estimates" text="Awaiting real model integration" />
+                <button className="text-button" onClick={() => setPage("Impact Analysis")}>Explore impact analysis →</button>
+              </article>
+            </section>
+          </>}
+
+          {page === "Disruptions" && <section className="panel table-panel">
+            <div className="panel-heading">
+              <div><h3>Disruption Registry</h3><p>Sample events and newly entered records</p></div>
+              <button className="secondary-button" onClick={() => setShowForm(true)}><Plus size={16} /> Add event</button>
+            </div>
+            <div className="table-wrap"><table>
+              <thead><tr><th>LOCATION</th><th>DISRUPTION</th><th>DURATION</th><th>SEVERITY</th><th>STATUS</th></tr></thead>
+              <tbody>{events.map(event => <tr key={event.id}>
+                <td><strong>{event.name}</strong><span className="table-subtitle">{event.area}</span></td>
+                <td>{event.disruptionType || "Road Closure"}</td><td>{event.duration}</td>
+                <td><span className={`severity severity-${event.severity.toLowerCase()}`}>{event.severity}</span></td>
+                <td><span className="status-pill">{event.status}</span></td>
+              </tr>)}</tbody>
+            </table></div>
+          </section>}
+
+          {page === "City Map" && <section className="panel real-map-panel">
+            <div className="panel-heading map-heading">
+              <div><h3>Bengaluru Disruption Map</h3><p>OpenStreetMap · Saved disruption locations</p></div>
+              <span className="chart-tag">DATABASE RECORDS</span>
+            </div>
+            <div className="map-legend">
+              <span><i className="legend-dot red-dot"></i> High severity</span>
+              <span><i className="legend-dot amber-dot"></i> Medium severity</span>
+            </div>
+            <MapContainer center={[12.9716, 77.5946]} zoom={12} scrollWheelZoom={true} className="leaflet-map">\n              <MapAutoFit events={events} />
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {events.filter(event =>
+                event.latitude !== null &&
+                event.latitude !== undefined &&
+                event.longitude !== null &&
+                event.longitude !== undefined
+              ).map(event => {
+                const color =
+                  event.severity === "Critical" || event.severity === "High"
+                    ? "#d94f5c"
+                    : event.severity === "Medium"
+                    ? "#d99a35"
+                    : "#399b78";
+
+                return (
+                  <Circle
+                    key={event.id}
+                    center={[Number(event.latitude), Number(event.longitude)]}
+                    radius={260}
+                    pathOptions={{ color, fillColor: color, fillOpacity: 0.25 }}
+                  >
+                    <Popup>
+                      <strong>{event.name}</strong><br />
+                      Area: {event.area}<br />
+                      Type: {event.disruptionType}<br />
+                      Severity: {event.severity}<br />
+                      Duration: {event.duration}<br />
+                      Affected population: {event.affectedPopulation ?? "Not specified"}<br />
+                      <small>User-entered record; not independently verified.</small>
+                    </Popup>
+                  </Circle>
+                );
+              })}
+            </MapContainer>
+            <p className="chart-disclaimer">Only saved disruptions with valid coordinates appear on the map. Records are user-entered and do not represent verified live traffic conditions.</p>
+          </section>}
+
+          {page === "Impact Analysis" && <section className="panel analysis-placeholder">
+            <div className="panel-heading">
+              <div>
+                <h3>Impact Analysis</h3>
+                <p>Evaluate the potential consequences of a saved city disruption</p>
+              </div>
+              <TrendingUp size={22} />
+            </div>
+
+            <div className="analysis-grid">
+              <Analysis title="INPUT FEATURES" heading="Location, duration, severity" text="Analysis uses the selected disruption record." />
+              <Analysis title="MODEL STATUS" heading="Prototype calculation" text="Rule-based estimate. SAP-RPT is not connected." />
+              <Analysis title="NEXT MILESTONE" heading="SAP-RPT inference" text="Connect and validate an authorised model endpoint." />
+            </div>
+
+            <div className="impact-controls">
+              <label htmlFor="impact-disruption">Select a saved disruption</label>
+              <select
+                id="impact-disruption"
+                value={selectedImpactId}
+
+========== 2. DASHBOARD CSS ==========
+#root{min-height:100vh}*{box-sizing:border-box}button,input,select{font:inherit}button{cursor:pointer}
+.app-shell{min-height:100vh;background:#f7f7fb;color:#202039}
+.sidebar{width:258px;position:fixed;inset:0 auto 0 0;z-index:20;display:flex;flex-direction:column;background:#fff;border-right:1px solid #ececf3;padding:26px 18px 18px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 4px 30px}.brand-icon{width:43px;height:43px;border-radius:13px;display:grid;place-items:center;color:white;background:linear-gradient(140deg,#6665df,#4946bd);box-shadow:0 7px 16px #5956c72b}.brand h2{font-size:15px;letter-spacing:.7px;margin:0 0 4px;font-weight:850}.brand span{font-size:9px;color:#9292a8;letter-spacing:1.2px;font-weight:750}
+.workspace-label{padding:0 11px;margin-bottom:13px;color:#a0a0b2;font-size:10px;font-weight:800;letter-spacing:1.5px}
+.nav-item{border:0;background:transparent;width:100%;display:flex;align-items:center;gap:13px;padding:13px 12px;border-radius:10px;text-align:left;color:#77778f;font-size:13px;font-weight:650;transition:.2s;margin-bottom:6px}.nav-item:hover,.nav-active{background:#eeeeff;color:#5351c4}.nav-active{font-weight:750}.nav-count{margin-left:auto;background:#fff;border-radius:6px;padding:3px 7px;font-size:11px}
+.sidebar-bottom{margin-top:auto}.system-card{border:1px solid #e9e9f4;background:#fafaff;padding:15px;border-radius:12px;margin-bottom:18px}.system-title{display:flex;align-items:center;gap:8px;color:#77778e;font-size:9px;letter-spacing:1px;font-weight:800}.live-dot{width:7px;height:7px;border-radius:50%;background:#20b982;box-shadow:0 0 0 3px #20b9821c;display:inline-block}.system-card h4{margin:13px 0 6px;font-size:13px}.system-card p{margin:0;font-size:11px;line-height:1.6;color:#85859b}.sidebar-footer{border-top:1px solid #eeeef4;padding:18px 4px 0;display:flex;align-items:center;gap:11px}.avatar{height:36px;width:36px;border-radius:11px;background:#e8e7ff;color:#5553bf;display:grid;place-items:center;font-size:12px;font-weight:800}.sidebar-footer strong,.sidebar-footer span{display:block}.sidebar-footer strong{font-size:12px}.sidebar-footer span{margin-top:4px;color:#9696a9;font-size:10px}
+.main-content{margin-left:258px;min-height:100vh}.topbar{height:70px;padding:0 36px;border-bottom:1px solid #ebebf2;background:#fff;display:flex;justify-content:space-between;align-items:center}.topbar-left,.topbar-right,.breadcrumb{display:flex;align-items:center}.breadcrumb{gap:9px;font-size:12px;color:#9999aa}.breadcrumb strong{color:#35354f}.topbar-right{gap:20px}.live-status{border:1px solid #e6e6f0;padding:8px 11px;border-radius:8px;display:flex;align-items:center;gap:9px;color:#66667f;font-size:9px;letter-spacing:.6px;font-weight:800}.top-date{font-size:10px;color:#85859b;letter-spacing:.8px;font-weight:750}
+.page-container{max-width:1600px;padding:34px 36px 20px;margin:auto}.welcome-row{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:25px}.eyebrow{display:flex;align-items:center;gap:8px;color:#6462cd;font-size:10px;letter-spacing:1.4px;font-weight:850}.welcome-row h1{font-size:clamp(26px,3vw,34px);letter-spacing:-1.2px;margin:11px 0 7px;font-weight:800}.page-subtitle{margin:0;color:#88889e;font-size:13px;line-height:1.6}
+.primary-button,.secondary-button{display:inline-flex;justify-content:center;align-items:center;gap:9px;border:0;border-radius:9px;padding:12px 16px;font-size:12px;font-weight:750;white-space:nowrap;transition:.2s}.primary-button{background:#5957cb;color:white;box-shadow:0 5px 13px #5957cb24}.primary-button:hover{background:#4745b5;transform:translateY(-1px)}.secondary-button{border:1px solid #e5e5f0;background:white;color:#5554b9}
+.notice-banner{display:flex;align-items:center;gap:13px;background:#f0f0ff;border:1px solid #e2e2ff;border-radius:11px;padding:14px 17px;margin-bottom:23px}.notice-icon{width:37px;height:37px;display:grid;place-items:center;background:white;color:#5957c7;border-radius:10px;flex-shrink:0}.notice-banner strong{font-size:12px}.notice-banner p{margin:4px 0 0;font-size:11px;line-height:1.5;color:#777792}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:17px;margin-bottom:22px}.metric-card{background:white;border:1px solid #ececf3;border-radius:13px;padding:20px;min-width:0;box-shadow:0 2px 8px #20204004}.metric-top{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#85859b;font-size:11px;font-weight:650}.metric-icon{width:37px;height:37px;border-radius:11px;display:grid;place-items:center;flex-shrink:0}.purple{color:#5a58c8;background:#efeeff}.orange{color:#e38b45;background:#fff3e8}.blue{color:#438bdb;background:#eaf5ff}.green{color:#239b79;background:#e7f9f1}.metric-card h2{margin:19px 0 9px;font-size:32px;letter-spacing:-1px;font-weight:800}.metric-card .connection-text{font-size:24px;color:#cc8a3b;letter-spacing:-.8px}.metric-caption{margin:0;color:#a0a0b0;font-size:10px}
+.content-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr);gap:20px}.panel{background:white;border:1px solid #ececf3;border-radius:13px;padding:23px;min-width:0;box-shadow:0 2px 8px #20204004}.panel-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.panel-heading h3{margin:0;font-size:15px;letter-spacing:-.2px}.panel-heading p{color:#9898aa;margin:7px 0 0;font-size:11px;line-height:1.5}.chart-tag{background:#f0efff;color:#5d5bc6;padding:6px 8px;border-radius:6px;font-size:8px;font-weight:850;letter-spacing:.7px;white-space:nowrap}.chart-area{height:270px;margin-top:24px}.chart-disclaimer{font-size:10px;color:#a0a0b0;line-height:1.5;border-top:1px solid #f0f0f5;padding-top:13px;margin:8px 0 0}.response-panel{display:flex;flex-direction:column}.snapshot-item{display:flex;align-items:center;gap:12px;padding:18px 0;border-bottom:1px solid #f0f0f5}.snapshot-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:10px;color:#6462c9;background:#f0efff;flex-shrink:0}.snapshot-item strong{font-size:11px}.snapshot-item p{color:#9999ab;font-size:10px;margin:5px 0 0}.text-button{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding:19px 0 0;border:0;background:transparent;color:#5957c6;font-size:11px;font-weight:750;text-align:left}
+.page-footer{padding:27px 0 5px;display:flex;justify-content:space-between;gap:15px;color:#a0a0b0;font-size:9px;letter-spacing:.4px}.table-panel{margin-top:3px}.table-wrap{width:100%;overflow-x:auto;margin-top:22px}table{border-collapse:collapse;width:100%;min-width:680px;text-align:left}th{background:#fafaff;padding:13px 14px;font-size:9px;color:#9090a6;letter-spacing:.8px;font-weight:800}td{padding:17px 14px;border-bottom:1px solid #f0f0f5;font-size:11px;color:#6e6e86}td strong,.table-subtitle{display:block}td strong{color:#32324b;font-size:12px;margin-bottom:5px}.table-subtitle{color:#9999ac;font-size:10px}.severity,.status-pill{display:inline-flex;align-items:center;border-radius:6px;padding:6px 9px;font-size:10px;font-weight:750}.severity-high{color:#cf5b5b;background:#fff0f0}.severity-medium{color:#c3873d;background:#fff6e8}.severity-low{color:#299978;background:#eaf9f3}.status-pill{color:#6462c5;background:#f0efff}
+.map-placeholder{min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;margin-top:4px}.map-placeholder-icon{width:65px;height:65px;border-radius:19px;display:grid;place-items:center;color:#5c5ac8;background:#efeeff}.map-placeholder h3{font-size:20px;margin:20px 0 8px}.map-placeholder p{max-width:450px;color:#8b8ba0;line-height:1.7;font-size:12px;margin:0 0 20px}.analysis-placeholder{margin-top:4px}.analysis-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-top:25px}.analysis-card{padding:20px;border:1px solid #ededf5;background:#fcfcff;border-radius:11px}.analysis-card span{color:#7775ca;font-size:9px;font-weight:850;letter-spacing:.9px}.analysis-card h4{font-size:14px;margin:15px 0 8px}.analysis-card p{color:#8f8fa3;font-size:11px;line-height:1.6;margin:0}
+.modal-backdrop{position:fixed;inset:0;z-index:100;background:#17172d80;display:grid;place-items:center;padding:20px;overflow-y:auto}.modal{width:100%;max-width:510px;background:white;border-radius:17px;padding:27px;box-shadow:0 24px 90px #0002;margin:auto}.modal-heading{display:flex;justify-content:space-between;gap:15px;margin-bottom:23px}.modal-heading h2{margin:10px 0 6px;font-size:22px;letter-spacing:-.7px}.modal-heading p{color:#89899f;font-size:11px;margin:0;line-height:1.6}.icon-button,.menu-toggle,.mobile-close{display:grid;place-items:center;border:1px solid #ececf4;background:white;color:#77778f;border-radius:9px;width:37px;height:37px;flex-shrink:0}.modal form{display:grid;gap:17px}.modal label{display:grid;gap:8px;color:#55556e;font-size:11px;font-weight:750}.modal input,.modal select{width:100%;border:1px solid #e6e6f0;border-radius:8px;padding:12px;background:white;color:#33334c;outline:none;font-size:12px}.modal input:focus,.modal select:focus{border-color:#7775d8;box-shadow:0 0 0 3px #7775d819}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:13px}.form-note{display:flex;align-items:flex-start;gap:9px;background:#fff8ec;color:#ad7a3e;border-radius:8px;padding:12px;font-size:10px;line-height:1.5}.form-note svg{flex-shrink:0}.submit-button{width:100%;margin-top:2px}.menu-toggle,.mobile-close,.mobile-overlay{display:none}
+@media(max-width:1150px){.sidebar{width:225px}.main-content{margin-left:225px}.topbar{padding:0 24px}.page-container{padding:28px 24px 20px}.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.content-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.sidebar{width:270px;transform:translateX(-100%);transition:transform .25s ease;box-shadow:none}.sidebar.sidebar-open{transform:translateX(0);box-shadow:15px 0 50px #11112420}.mobile-overlay{display:block;position:fixed;inset:0;background:#11112470;z-index:15;border:0}.mobile-close{display:grid;margin-left:auto}.main-content{margin-left:0}.topbar{height:61px;padding:0 16px}.menu-toggle{display:grid;margin-right:12px}.topbar-right{gap:0}.top-date{display:none}.live-status{font-size:8px;padding:7px}.page-container{padding:25px 15px 16px}.welcome-row{align-items:flex-start;flex-direction:column;gap:17px}.welcome-row h1{font-size:28px}.metrics-grid{gap:10px}.metric-card{padding:14px}.metric-top{font-size:10px}.metric-icon{width:32px;height:32px}.metric-card h2{font-size:28px}.metric-card .connection-text{font-size:20px}.panel{padding:17px}.chart-area{height:230px}.analysis-grid{grid-template-columns:1fr}.page-footer{flex-direction:column;line-height:1.5}.modal{padding:20px}}
+@media(max-width:380px){.form-row{grid-template-columns:1fr}.metric-card{padding:11px}}
+
+.real-map-panel {
+  margin-top: 4px;
+}
+
+.map-heading {
+  margin-bottom: 18px;
+}
+
+.map-legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  color: #77778f;
+  font-size: 11px;
+}
+
+.map-legend span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.red-dot {
+  background: #d94f5c;
+}
+
+.amber-dot {
+  background: #d99a35;
+}
+
+.leaflet-map {
+  width: 100%;
+  height: 470px;
+  border-radius: 11px;
+  z-index: 1;
+}
+
+@media (max-width: 700px) {
+  .leaflet-map {
+    height: 380px;
+  }
+}
+
+/* URBAN RIPPLE - New module styling */
+.module-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 4px;
+}
+
+.module-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.module-heading p {
+  color: #9292a5;
+  font-size: 12px;
+  margin-top: 7px;
+}
+
+.module-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.module-kpis article {
+  background: white;
+  border: 1px solid #ececf3;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.module-kpis span {
+  display: block;
+  color: #8f8fa3;
+  font-size: 11px;
+}
+
+.module-kpis strong {
+  display: block;
+  font-size: 25px;
+  margin-top: 12px;
+}
+
+.module-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.module-charts h3 {
+  font-size: 14px;
+}
+
+.module-record,
+.integration-stage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 12px;
+  padding: 18px;
+}
+
+.module-record p,
+.recommendation-card p,
+.integration-stage p {
+  color: #9292a5;
+  font-size: 11px;
+}
+
+.module-risk {
+  text-align: right;
+}
+
+.module-risk strong,
+.module-risk span {
+  display: block;
+}
+
+.module-risk span {
+  color: #7775ca;
+  font-size: 11px;
+}
+
+.ripple-card h3,
+.recommendation-card h3 {
+  margin-bottom: 5px;
+}
+
+.ripple-arrow {
+  color: #625fc7;
+  margin: 15px 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ripple-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ripple-effects span {
+  background: #f0efff;
+  color: #5957b5;
+  padding: 10px 13px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.recommendation-card li {
+  font-size: 12px;
+  margin: 10px 0;
+}
+
+.report-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.integration-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: center;
+}
+
+.integration-flow {
+  display: grid;
+  gap: 12px;
+}
+
+.integration-stage {
+  justify-content: flex-start;
+}
+
+.integration-stage > span {
+  color: #625fc7;
+  font-weight: 800;
+  font-size: 20px;
+}
+
+.integration-stage h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+@media(max-width: 800px) {
+  .module-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .module-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media(max-width: 450px) {
+  .module-kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+========== 3. GLOBAL CSS ==========
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202039;background:#f7f7fb;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+html{min-width:320px;min-height:100%}
+body{margin:0;min-width:320px;min-height:100vh}
+button,input,select{font-family:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #7775d866;outline-offset:2px}
+::selection{background:#dadaff;color:#27274a}
+
+========== 4. ANALYTICS COMPONENT ==========
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, CartesianGrid
+} from "recharts";
+
+export default function Analytics({ events }) {
+  const severity = ["Low", "Medium", "High", "Critical"].map(name => ({
+    name,
+    count: events.filter(e => e.severity === name).length
+  }));
+
+  const types = ["Road Closure", "Water Outage", "Power Outage"].map(name => ({
+    name,
+    count: events.filter(e => e.disruptionType === name).length
+  }));
+
+  const population = events.reduce(
+    (sum, e) => sum + Number(e.affectedPopulation || 0), 0
+  );
+
+  const active = events.filter(e => e.status === "Active").length;
+  const highRisk = events.filter(e =>
+    ["High", "Critical"].includes(e.severity)
+  ).length;
+
+  return (
+    <section className="module-page">
+      <div className="module-heading">
+        <h2>City Analytics</h2>
+        <p>Statistics calculated from saved disruption records</p>
+      </div>
+
+      <div className="module-kpis">
+        <article><span>Total disruptions</span><strong>{events.length}</strong></article>
+        <article><span>Active disruptions</span><strong>{active}</strong></article>
+        <article><span>High-risk records</span><strong>{highRisk}</strong></article>
+        <article><span>Affected population</span><strong>{population.toLocaleString("en-IN")}</strong></article>
+      </div>
+
+      <div className="module-charts">
+        <article className="panel">
+          <h3>Severity Distribution</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={severity}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#625fc7" radius={[5,5,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </article>
+
+        <article className="panel">
+          <h3>Disruption Type Distribution</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart>
+              <Pie data={types} dataKey="count" nameKey="name"
+                outerRadius={85} label>
+                {types.map((item, index) => (
+                  <Cell key={item.name}
+                    fill={["#625fc7", "#e5a34b", "#db6872"][index]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </article>
+      </div>
+
+      <p className="chart-disclaimer">
+        Analytics reflect records currently stored in the application.
+        They are not live city-wide statistics.
+      </p>
+    </section>
+  );
+}
+
+========== 5. ANALYTICS DASHBOARD ==========
+import { useEffect, useState } from "react";
+import { getAnalyticsOverview } from "../../services/analyticsService";
+import { exportAnalyticsCSV } from "../../utils/analyticsExport";
+import AnalyticsCharts from "./charts/AnalyticsCharts";
+import { exportAnalyticsJSON } from "../../utils/analyticsJsonExport";
+import "./AnalyticsDashboard.css";
+
+export default function AnalyticsDashboard() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  async function applyQuickFilter(days) {
+    const end = new Date();
+    const start = new Date();
+
+    let startValue = "";
+
+    if (days !== null) {
+      start.setDate(start.getDate() - days);
+      startValue = start.toISOString().slice(0, 10);
+    }
+
+    const endValue = days === null ? "" : end.toISOString().slice(0, 10);
+
+    setStartDate(startValue);
+    setEndDate(endValue);
+
+    try {
+      setLoading(true);
+      setError("");
+      const result = await getAnalyticsOverview(startValue, endValue);
+      setData(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadAnalytics() {
+    try {
+      setLoading(true);
+      setError("");
+      const result = await getAnalyticsOverview(startDate, endDate);
+      setData(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAnalytics();
+  }, []);
+
+  if (loading) return <div className="analytics-page">Loading analytics...</div>;
+
+  if (error) {
+    return (
+      <div className="analytics-page">
+        <h2>Analytics Dashboard</h2>
+        <p className="analytics-error">{error}</p>
+        <button onClick={loadAnalytics}>Retry</button>
+      </div>
+    );
+  }
+
+  const highRiskCount = Number(data.risk_summary?.high_risk || 0);
+  const totalDisruptions = Number(data.total_disruptions || 0);
+  const highRiskPercentage = totalDisruptions
+    ? (highRiskCount / totalDisruptions) * 100
+    : 0;
+
+  const highRiskPopulation = Number(
+    data.risk_summary?.high_risk_population || 0
+  );
+  const totalAffectedPopulation = Number(data.affected_population || 0);
+
+  const affectedPopulationPercentage = totalAffectedPopulation
+    ? (highRiskPopulation / totalAffectedPopulation) * 100
+    : 0;
+
+  const maxMonthly = Math.max(
+    1,
+    ...(data.monthly_trend || []).map(item => item.count)
+  );
+
+  return (
+    <main className="analytics-page">
+      <header className="analytics-header">
+        <div>
+          <p className="analytics-eyebrow">URBAN RIPPLE / INSIGHTS</p>
+          <h1>Analytics Dashboard</h1>
+          <p>Understand disruption patterns and their city-wide impact.</p>
+        </div>
+        <div className="analytics-actions">
+          <button onClick={() => exportAnalyticsCSV(data)}>Export CSV</button>
+          <button onClick={() => exportAnalyticsJSON(data)}>Export JSON</button>
+          <button onClick={loadAnalytics}>Refresh Data</button>
+        </div>
+      </header>
+
+      <section className="analytics-quick-filters">
+        <button onClick={() => applyQuickFilter(7)}>Last 7 Days</button>
+        <button onClick={() => applyQuickFilter(30)}>Last 30 Days</button>
+        <button onClick={() => applyQuickFilter(90)}>Last 90 Days</button>
+        <button onClick={() => applyQuickFilter(null)}>All Time</button>
+      </section>
+
+      <section className="analytics-filters">
+        <label>
+          Start date
+          <input
+            type="date"
+            value={startDate}
+            max={endDate || undefined}
+            onChange={event => setStartDate(event.target.value)}
+          />
+        </label>
+        <label>
+          End date
+          <input
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={event => setEndDate(event.target.value)}
+          />
+        </label>
+        <button onClick={loadAnalytics}>Apply Filters</button>
+        <button onClick={() => {
+          setStartDate("");
+          setEndDate("");
+          getAnalyticsOverview().then(setData).catch(err => setError(err.message));
+        }}>
+          Clear Filters
+        </button>
+      </section>
+
+      <section className="analytics-risk-summary">
+        <article>
+          <span>Critical Disruptions</span>
+          <strong>{data.risk_summary?.critical ?? 0}</strong>
+        </article>
+        <article>
+          <span>High Severity Disruptions</span>
+          <strong>{data.risk_summary?.high ?? 0}</strong>
+        </article>
+        <article>
+          <span>High-Risk Events</span>
+          <strong>{data.risk_summary?.high_risk ?? 0}</strong>
+        </article>
+        <article>
+          <span>Population in High-Risk Events</span>
+          <strong>{Number(data.risk_summary?.high_risk_population ?? 0).toLocaleString("en-IN")}</strong>
+        </article>
+      </section>
+
+      <section className="analytics-exposure">
+        <div className="analytics-exposure-heading">
+          <div>
+            <h2>Risk Exposure Analysis</h2>
+            <p>Based on recorded high and critical severity events.</p>
+          </div>
+        </div>
+
+        <div className="analytics-exposure-item">
+          <div>
+            <span>High-risk share of disruptions</span>
+            <strong>{highRiskPercentage.toFixed(1)}%</strong>
+          </div>
+          <div className="analytics-exposure-track">
+            <div
+              className="analytics-exposure-fill"
+              style={{ width: `${Math.min(highRiskPercentage, 100)}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="analytics-exposure-item">
+          <div>
+            <span>High-risk share of affected population</span>
+            <strong>{affectedPopulationPercentage.toFixed(1)}%</strong>
+          </div>
+          <div className="analytics-exposure-track">
+            <div
+              className="analytics-exposure-fill population"
+              style={{ width: `${Math.min(affectedPopulationPercentage, 100)}%` }}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="analytics-stats">
+        <article className="analytics-card">
+          <span>Total Disruptions</span>
+          <strong>{data.total_disruptions}</strong>
+        </article>
+        <article className="analytics-card">
+          <span>Population Affected</span>
+          <strong>{Number(data.affected_population).toLocaleString("en-IN")}</strong>
+        </article>
+        <article className="analytics-card">
+          <span>Disruption Categories</span>
+          <strong>{data.disruption_types.length}</strong>
+        </article>
+        <article className="analytics-card">
+          <span>Locations Impacted</span>
+          <strong>{data.location_impact.length}</strong>
+        </article>
+      </section>
+
+      <AnalyticsCharts data={data} />
+
+      <section className="analytics-grid">
+        <article className="analytics-panel">
+          <h2>Monthly Disruption Trend</h2>
+          {data.monthly_trend.length === 0 ? (
+            <p>No monthly records available.</p>
+          ) : (
+            <div className="analytics-bars">
+              {data.monthly_trend.map(item => (
+                <div className="analytics-bar-row" key={item.month}>
+                  <span>{item.month}</span>
+                  <div className="analytics-bar-track">
+                    <div
+                      className="analytics-bar"
+                      style={{ width: `${(item.count / maxMonthly) * 100}%` }}
+                    />
+                  </div>
+                  <strong>{item.count}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+
+        <article className="analytics-panel">
+          <h2>Severity Distribution</h2>
+          {data.severity_distribution.length === 0 ? (
+            <p>No severity records available.</p>
+          ) : (
+            data.severity_distribution.map(item => (
+              <div className="analytics-list-row" key={item.severity}>
+                <span>{item.severity || "Unspecified"}</span>
+                <strong>{item.count}</strong>
+              </div>
+            ))
+          )}
+        </article>
+
+        <article className="analytics-panel">
+          <h2>Disruption Types</h2>
+          {data.disruption_types.length === 0 ? (
+            <p>No disruption types available.</p>
+          ) : (
+            data.disruption_types.map(item => (
+              <div className="analytics-list-row" key={item.disruption_type}>
+                <span>{item.disruption_type || "Unspecified"}</span>
+                <strong>{item.count}</strong>
+              </div>
+            ))
+          )}
+        </article>
+
+        <article className="analytics-panel">
+          <h2>Location-wise Impact</h2>
+          {data.location_impact.length === 0 ? (
+            <p>No location records available.</p>
+          ) : (
+            data.location_impact.map(item => (
+              <div className="analytics-location-row" key={item.location}>
+                <div>
+                  <strong>{item.location || "Unknown location"}</strong>
+                  <span>
+                    {Number(item.affected_population || 0).toLocaleString("en-IN")}
+                    {" "}people affected
+                  </span>
+                </div>
+                <strong>{item.count} events</strong>
+              </div>
+            ))
+          )}
+        </article>
+      </section>
+
+      <p className="analytics-note">
+        Figures are calculated from recorded disruptions. They represent
+        reported data, not independently verified real-world impact.
+      </p>
+    </main>
+  );
+}
+
+========== 6. ANALYTICS SERVICE ==========
+import { API_BASE_URL as API_URL } from "./api.js";
+export async function getAnalyticsOverview(startDate = "", endDate = "") {
+  const token = localStorage.getItem("urban_ripple_token");
+
+  const params = new URLSearchParams();
+
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+
+  const query = params.toString();
+  const url = `${API_URL}/api/analytics/overview${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.detail || `Analytics request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+========== 7. ANALYTICS BACKEND ROUTES ==========
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from security.roles import require_roles
+from analytics.service import get_analytics
+
+router = APIRouter(
+    prefix="/api/analytics",
+    tags=["Analytics"]
+)
+
+
+@router.get("/overview")
+def analytics_overview(
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    user=Depends(require_roles("admin", "official", "analyst"))
+):
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="Start date cannot be after end date."
+        )
+
+    return get_analytics(
+        start_date.isoformat() if start_date else None,
+        end_date.isoformat() if end_date else None
+    )
+
+========== 8. ANALYTICS BACKEND SERVICE ==========
+import sqlite3
+from pathlib import Path
+
+DB_PATH = Path(__file__).resolve().parents[1] / "urban_ripple.db"
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_analytics(start_date=None, end_date=None):
+    conditions = []
+    params = []
+
+    if start_date:
+        conditions.append("date(created_at) >= date(?)")
+        params.append(start_date)
+
+    if end_date:
+        conditions.append("date(created_at) <= date(?)")
+        params.append(end_date)
+
+    where_clause = (
+        " WHERE " + " AND ".join(conditions)
+        if conditions else ""
+    )
+
+    with get_connection() as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM disruptions{where_clause}",
+            params
+        ).fetchone()[0]
+
+        severity = conn.execute(
+            f"""
+            SELECT severity, COUNT(*) AS count
+            FROM disruptions
+            {where_clause}
+            GROUP BY severity
+            """,
+            params
+        ).fetchall()
+
+        types = conn.execute(
+            f"""
+            SELECT disruption_type, COUNT(*) AS count
+            FROM disruptions
+            {where_clause}
+            GROUP BY disruption_type
+            ORDER BY count DESC
+            """,
+            params
+        ).fetchall()
+
+        locations = conn.execute(
+            f"""
+            SELECT location, COUNT(*) AS count,
+                   SUM(affected_population) AS affected_population
+            FROM disruptions
+            {where_clause}
+            GROUP BY location
+            ORDER BY affected_population DESC
+            """,
+            params
+        ).fetchall()
+
+        population = conn.execute(
+            f"""
+            SELECT COALESCE(SUM(affected_population), 0)
+            FROM disruptions
+            {where_clause}
+            """,
+            params
+        ).fetchone()[0]
+
+
+        risk_summary = conn.execute(
+            f"""
+            SELECT
+                SUM(CASE WHEN lower(severity) = 'critical' THEN 1 ELSE 0 END) AS critical,
+                SUM(CASE WHEN lower(severity) = 'high' THEN 1 ELSE 0 END) AS high,
+                SUM(CASE WHEN lower(severity) IN ('high', 'critical') THEN 1 ELSE 0 END) AS high_risk,
+                SUM(CASE WHEN lower(severity) IN ('high', 'critical')
+                    THEN COALESCE(affected_population, 0) ELSE 0 END) AS high_risk_population
+            FROM disruptions
+            {where_clause}
+            """,
+            params
+        ).fetchone()
+
+        monthly = conn.execute(
+            f"""
+            SELECT strftime('%Y-%m', created_at) AS month,
+                   COUNT(*) AS count
+            FROM disruptions
+            {where_clause}
+            GROUP BY month
+            ORDER BY month
+            """,
+            params
+        ).fetchall()
+
+    return {
+        "total_disruptions": total,
+        "affected_population": population,
+        "severity_distribution": [dict(row) for row in severity],
+        "disruption_types": [dict(row) for row in types],
+        "location_impact": [dict(row) for row in locations],
+        "monthly_trend": [dict(row) for row in monthly],
+        "risk_summary": dict(risk_summary),
+        "filters": {
+            "start_date": start_date,
+            "end_date": end_date
+        }
+    }
+
+========== 9. DISRUPTION DATABASE SCHEMA ==========
+44-    return conn
+45-
+46-def init_db():
+47-    with get_db() as conn:
+48-        conn.execute("""
+49:            CREATE TABLE IF NOT EXISTS disruptions (
+50-                id TEXT PRIMARY KEY,
+51-                title TEXT NOT NULL,
+52-                disruption_type TEXT NOT NULL,
+53-                location TEXT NOT NULL,
+54-                latitude REAL,
+55-                longitude REAL,
+56-                duration_hours REAL NOT NULL,
+57-                affected_population INTEGER NOT NULL,
+58-                severity TEXT NOT NULL,
+59-                created_at TEXT NOT NULL,
+60-                status TEXT NOT NULL
+61-            )
+62-        """)
+63-
+64-def row_to_dict(row):
+65-    return dict(row) if row else None
+66-
+67-init_db()
+68-
+69-
+70-class DisruptionCreate(BaseModel):
+71-    title: str = Field(min_length=3, max_length=150)
+72-    disruption_type: Literal[
+73-        "Road Closure", "Water Outage", "Power Outage"
+74-    ]
+
+========== 10. MAP AND CHART LIBRARIES ==========
+frontend@0.0.0 /Users/apple/Desktop/urban-ripple/frontend
+├── leaflet@1.9.4
+├── lucide-react@1.64.0
+├── react-leaflet@5.0.0
+└── recharts@3.10.1
+
+
+========== 11. FRONTEND BUILD CONFIGURATION ==========
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})

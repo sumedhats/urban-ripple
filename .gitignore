@@ -1,0 +1,52 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*service-account*.json
+firebase-service-account.json
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node and React
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+
+# Backups
+backups/
+urban-ripple-backups/
+
+# Operating system and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Temporary source-code backups
+*.backup
+*.backup_*
+*_backup.py
+*_backup.jsx
+*_before_*.py
+*_before_*.jsx
+backend/main.py.cors_backup
+urban-ripple/

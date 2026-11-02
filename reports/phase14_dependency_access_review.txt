@@ -1,0 +1,485 @@
+==========================================
+URBAN RIPPLE — PHASE 14
+DEPENDENCY AND ACCESS-CONTROL REVIEW
+==========================================
+
+1. Creating backups
+Backup: backups/phase_14/20261101-112740
+
+2. Checking vulnerable dependencies
+frontend@0.0.0 /Users/apple/Desktop/urban-ripple/frontend
+├─┬ vite-plugin-pwa@2.0.0
+│ └─┬ workbox-build@7.4.1
+│   ├─┬ @rollup/plugin-node-resolve@16.0.3
+│   │ └── deepmerge@4.3.1
+│   ├─┬ @trickfilm400/rollup-plugin-off-main-thread@3.0.0-pre1
+│   │ └─┬ ejs@3.1.10
+│   │   └─┬ jake@10.9.4
+│   │     └─┬ filelist@1.0.6
+│   │       └── minimatch@5.1.9
+│   └─┬ glob@11.1.0
+│     └── minimatch@10.2.6
+└── xlsx@0.18.5
+
+
+3. Finding SheetJS usage
+frontend/src/modules/Reports.jsx:2:import * as XLSX from "xlsx";
+frontend/src/modules/Reports.jsx:18:    const sheet = XLSX.utils.json_to_sheet(rows);
+frontend/src/modules/Reports.jsx:19:    const book = XLSX.utils.book_new();
+frontend/src/modules/Reports.jsx:20:    XLSX.utils.book_append_sheet(book, sheet, "Disruptions");
+frontend/src/modules/Reports.jsx:21:    XLSX.writeFile(book, "Urban_Ripple_Report.xlsx");
+
+4. Checking package versions
+# npm audit report
+
+deepmerge  >=4.2.0
+deepmerge mergeObject() allows prototype poisoning of returned objects - https://github.com/advisories/GHSA-gcqx-w48m-w2h4
+fix available via `npm audit fix --force`
+Will install vite-plugin-pwa@1.1.0, which is a breaking change
+node_modules/deepmerge
+  @rollup/plugin-node-resolve  >=8.0.0
+  Depends on vulnerable versions of deepmerge
+  node_modules/@rollup/plugin-node-resolve
+    workbox-build  >=6.0.0-alpha.0
+    Depends on vulnerable versions of @rollup/plugin-node-resolve
+    Depends on vulnerable versions of @trickfilm400/rollup-plugin-off-main-thread
+    Depends on vulnerable versions of glob
+    node_modules/workbox-build
+      vite-plugin-pwa  >=1.2.0
+      Depends on vulnerable versions of workbox-build
+      node_modules/vite-plugin-pwa
+
+glob  3.0.0 - 14.0.1
+Severity: moderate
+Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal - https://github.com/advisories/GHSA-3g3m-2fjr-6pw4
+Depends on vulnerable versions of minimatch
+fix available via `npm audit fix --force`
+Will install vite-plugin-pwa@1.1.0, which is a breaking change
+node_modules/glob
+
+minimatch  <11.0.1
+Severity: moderate
+minimatch has potential denial of service via globparts amplification - https://github.com/advisories/GHSA-g3hv-75wg-m249
+fix available via `npm audit fix --force`
+Will install vite-plugin-pwa@1.1.0, which is a breaking change
+node_modules/filelist/node_modules/minimatch
+node_modules/minimatch
+  filelist  >=0.0.2
+  Depends on vulnerable versions of minimatch
+  node_modules/filelist
+    jake  >=10.6.1
+    Depends on vulnerable versions of filelist
+    node_modules/jake
+      ejs  3.1.2 - 4.0.1
+      Depends on vulnerable versions of jake
+      node_modules/ejs
+        @trickfilm400/rollup-plugin-off-main-thread  <=3.1.0-pre2
+        Depends on vulnerable versions of ejs
+        node_modules/@trickfilm400/rollup-plugin-off-main-thread
+
+xlsx  *
+Severity: high
+Prototype Pollution in sheetJS - https://github.com/advisories/GHSA-4r6h-8v6p-xvw6
+SheetJS Regular Expression Denial of Service (ReDoS) - https://github.com/advisories/GHSA-5pgg-2g8v-p4x9
+No fix available
+node_modules/xlsx
+
+11 vulnerabilities (2 low, 8 moderate, 1 high)
+
+To address all issues possible (including breaking changes), run:
+  npm audit fix --force
+
+Some issues need review, and may require choosing
+a different dependency.
+
+5. Inspecting backend authentication
+import os
+import sqlite3
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+
+import jwt
+from dotenv import load_dotenv
+from pwdlib import PasswordHash
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr, Field
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+DB_PATH = BASE_DIR / "urban_ripple.db"
+
+load_dotenv(BASE_DIR / ".env")
+
+SECRET_KEY = os.getenv("JWT_SECRET")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET is missing from backend/.env")
+
+password_hash = PasswordHash.recommended()
+security = HTTPBearer()
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_users_table():
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'public',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+
+init_users_table()
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+def create_token(user_id: int, email: str, role: str):
+    expiry = datetime.now(timezone.utc) + timedelta(hours=8)
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "role": role,
+        "exp": expiry
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        user_id = int(payload["sub"])
+    except (jwt.InvalidTokenError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    with get_connection() as conn:
+        user = conn.execute(
+            "SELECT id, name, email, role FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return dict(user)
+
+
+@router.post("/register", status_code=201)
+def register(data: RegisterRequest):
+    email = str(data.email).lower().strip()
+    hashed = password_hash.hash(data.password)
+
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute("""
+                INSERT INTO users (name, email, password_hash, role, created_at)
+                VALUES (?, ?, ?, 'public', ?)
+            """, (
+                data.name.strip(),
+                email,
+                hashed,
+                datetime.now(timezone.utc).isoformat()
+            ))
+            user_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    return {
+        "message": "Registration successful",
+        "user": {
+            "id": user_id,
+            "name": data.name.strip(),
+            "email": email,
+            "role": "public"
+        }
+    }
+
+
+@router.post("/login")
+def login(data: LoginRequest):
+    email = str(data.email).lower().strip()
+
+    with get_connection() as conn:
+        user = conn.execute(
+            "SELECT * FROM users WHERE email = ?",
+            (email,)
+        ).fetchone()
+
+    if user is None or not password_hash.verify(
+        data.password, user["password_hash"]
+    ):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_token(user["id"], user["email"], user["role"])
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "role": user["role"]
+        }
+    }
+
+
+@router.get("/me")
+def my_profile(user: dict = Depends(get_current_user)):
+    return {"user": user}
+
+6. Inspecting backend permissions
+from fastapi import Depends, HTTPException, status
+from security.auth import get_current_user
+
+ROLE_PERMISSIONS = {
+    "admin": {
+        "users:manage",
+        "departments:manage",
+        "disruptions:submit",
+        "disruptions:read",
+        "disruptions:read_public",
+        "disruptions:review",
+        "disruptions:assign",
+        "analytics:read",
+        "reports:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+        "audit:read",
+        "settings:manage",
+    },
+
+    "official": {
+        "disruptions:read",
+        "disruptions:review",
+        "disruptions:assign",
+        "analytics:read",
+        "reports:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+    },
+
+    "analyst": {
+        "disruptions:read",
+        "analytics:read",
+        "reports:read",
+    },
+
+    "emergency": {
+        "disruptions:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+    },
+
+    "public": {
+        "disruptions:submit",
+        "disruptions:read_public",
+    },
+}
+
+
+def require_roles(*allowed_roles):
+    def dependency(user=Depends(get_current_user)):
+        role = str(user.get("role", "public")).lower()
+
+        if role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your role is not permitted to perform this action."
+            )
+
+        return user
+
+    return dependency
+
+
+def require_permission(permission):
+    def dependency(user=Depends(get_current_user)):
+        role = str(user.get("role", "public")).lower()
+
+        if permission not in ROLE_PERMISSIONS.get(role, set()):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: {permission}"
+            )
+
+        return user
+
+    return dependency
+
+7. Checking route protection
+backend/security/auth.py:74:def get_current_user(
+backend/security/auth.py:160:def my_profile(user: dict = Depends(get_current_user)):
+backend/security/roles.py:2:from security.auth import get_current_user
+backend/security/roles.py:57:    def dependency(user=Depends(get_current_user)):
+backend/security/roles.py:72:    def dependency(user=Depends(get_current_user)):
+backend/security/permissions/dependencies.py:2:from security.auth import get_current_user
+backend/security/permissions/dependencies.py:8:    def role_checker(current_user=Depends(get_current_user)):
+backend/security/permissions/dependencies.py:20:    def permission_checker(current_user=Depends(get_current_user)):
+backend/emergency/routes.py:72:    user=Depends(require_roles("admin", "official"))
+backend/emergency/routes.py:116:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/emergency/routes.py:135:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/emergency/routes.py:155:    user=Depends(require_roles("admin", "official"))
+backend/emergency/routes.py:205:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:64:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:118:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:128:    user=Depends(require_roles("admin", "official"))
+backend/disruption_management/routes.py:178:    user=Depends(require_roles("admin"))
+backend/analytics/routes.py:17:    user=Depends(require_roles("admin", "official", "analyst"))
+
+8. Checking registered routers
+14:app = FastAPI(
+20:app.include_router(emergency_router)
+21:app.include_router(intelligence_router)
+23:app.include_router(auth_router)
+24:app.include_router(management_router)
+240:app.include_router(analytics_router)
+
+9. Checking authentication frontend
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+export async function registerUser(data) {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Registration failed");
+  return result;
+}
+
+export async function loginUser(data) {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Login failed");
+  return result;
+}
+
+export async function getMyProfile(token) {
+  const response = await fetch(`${API_URL}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Session expired");
+  return result.user;
+}
+import { createContext, useContext, useEffect, useState } from "react";
+import { getMyProfile, loginUser } from "../../services/authService";
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("urban_ripple_token");
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    getMyProfile(token)
+      .then(setUser)
+      .catch(() => sessionStorage.removeItem("urban_ripple_token"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function login(email, password) {
+    const result = await loginUser({ email, password });
+    sessionStorage.setItem("urban_ripple_token", result.access_token);
+    setUser(result.user);
+    return result.user;
+  }
+
+  function logout() {
+    sessionStorage.removeItem("urban_ripple_token");
+    setUser(null);
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be inside AuthProvider");
+  return context;
+}
+
+10. Checking production build
+
+> frontend@0.0.0 build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 2869 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          0.45 kB │ gzip:   0.29 kB
+dist/assets/index-C5WF3ZBA.css          33.20 kB │ gzip:  10.84 kB
+dist/assets/purify.es-Dqk5qvad.js       29.02 kB │ gzip:  11.45 kB
+dist/assets/index.es-Bpv0VaA1.js       151.37 kB │ gzip:  48.88 kB
+dist/assets/html2canvas-C63oUYN6.js    199.39 kB │ gzip:  46.73 kB
+dist/assets/index-C8VlKsJt.js        1,505.32 kB │ gzip: 464.54 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 471ms
+
+==========================================
+PHASE 14 REVIEW COMPLETE
+Frontend build exit code: 0
+Backup: backups/phase_14/20261101-112740
+Report: reports/phase14_dependency_access_review.txt
+No dependencies or source files were changed.
+==========================================

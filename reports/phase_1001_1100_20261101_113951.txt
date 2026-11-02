@@ -1,0 +1,343 @@
+
+1001–1010: PROJECT ENVIRONMENT
+/Users/apple/Desktop/urban-ripple
+Python 3.14.3
+v22.23.1
+10.9.8
+Backend virtual environment:
+FOUND
+Frontend dependencies:
+FOUND
+
+1011–1020: IMPORTANT FILES
+FOUND: backend/main.py
+FOUND: backend/security/auth.py
+FOUND: backend/security/roles.py
+FOUND: frontend/src/main.jsx
+FOUND: frontend/src/AppRouter.jsx
+FOUND: frontend/src/App.jsx
+FOUND: frontend/src/auth/AuthScreen.jsx
+FOUND: frontend/package.json
+FOUND: backend/requirements.txt
+
+1021–1030: FRONTEND AUTHENTICATION
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import "./modules/auth/Auth.css";
+import AppRouter from "./AppRouter.jsx";
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <AppRouter />
+  </StrictMode>
+);
+import { useEffect, useState } from "react";
+import App from "./App.jsx";
+import AuthScreen from "./auth/AuthScreen.jsx";
+import RolePortal from "./portals/RolePortal.jsx";
+
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+export default function AppRouter() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifySession() {
+      const token = localStorage.getItem("urban_ripple_token");
+
+      if (!token) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Session expired");
+
+        const data = await response.json();
+        if (active) setUser(data.user);
+      } catch {
+        localStorage.removeItem("urban_ripple_token");
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    verifySession();
+    return () => { active = false; };
+  }, []);
+
+  function logout() {
+    localStorage.removeItem("urban_ripple_token");
+    setUser(null);
+    setWorkspace(false);
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40, fontFamily: "Arial" }}>Verifying session...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={setUser} />;
+  }
+
+  if (!workspace) {
+    return (
+      <RolePortal
+        user={user}
+        onOpenWorkspace={() => setWorkspace(true)}
+        onLogout={logout}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        padding: "10px 20px",
+        background: "#f1f1fa",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <span>Signed in: {user.name} ({user.role})</span>
+        <button onClick={() => setWorkspace(false)}>Portal</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+      <App />
+    </div>
+  );
+}
+import { useState } from "react";
+
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+export default function AuthScreen({ onLogin }) {
+  const [mode, setMode] = useState("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (mode === "register") {
+        const registration = await fetch(`${API}/api/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password })
+        });
+
+        const result = await registration.json();
+
+        if (!registration.ok) {
+          throw new Error(result.detail || "Registration failed");
+        }
+      }
+
+      const response = await fetch(`${API}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Login failed");
+      }
+
+      localStorage.setItem("urban_ripple_token", data.access_token);
+      onLogin(data.user);
+    } catch (err) {
+      setError(err.message || "Unable to connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main style={styles.page}>
+      <section style={styles.card}>
+        <div style={styles.logo}>UR</div>
+        <h1>URBAN RIPPLE</h1>
+        <p style={styles.subtitle}>City Disruption Intelligence Platform</p>
+
+        <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+
+        <form onSubmit={submit}>
+          {mode === "register" && (
+            <label style={styles.label}>
+              Full name
+              <input
+                style={styles.input}
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+                minLength={2}
+              />
+            </label>
+          )}
+
+          <label style={styles.label}>
+            Email address
+            <input
+              style={styles.input}
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </label>
+
+          <label style={styles.label}>
+            Password
+            <input
+              style={styles.input}
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </label>
+
+          {error && <p style={styles.error}>{error}</p>}
+
+          <button style={styles.button} disabled={loading}>
+            {loading ? "Please wait..." :
+              mode === "login" ? "Sign in" : "Create account"}
+          </button>
+        </form>
+
+        <p style={styles.switch}>
+          {mode === "login" ? "New to URBAN RIPPLE?" : "Already registered?"}
+          {" "}
+          <button
+            style={styles.link}
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError("");
+            }}
+          >
+            {mode === "login" ? "Create account" : "Sign in"}
+          </button>
+        </p>
+
+        <small style={styles.note}>
+          New accounts receive the public role by default.
+        </small>
+      </section>
+    </main>
+  );
+}
+
+const styles = {
+
+1031–1040: TOKEN STORAGE REFERENCES
+frontend/src/AppRouter.jsx:17:      const token = localStorage.getItem("urban_ripple_token");
+frontend/src/AppRouter.jsx:34:        localStorage.removeItem("urban_ripple_token");
+frontend/src/AppRouter.jsx:46:    localStorage.removeItem("urban_ripple_token");
+frontend/src/auth/AuthScreen.jsx:45:      localStorage.setItem("urban_ripple_token", data.access_token);
+frontend/src/modules/auth/AuthContext.jsx:11:    const token = sessionStorage.getItem("urban_ripple_token");
+frontend/src/modules/auth/AuthContext.jsx:20:      .catch(() => sessionStorage.removeItem("urban_ripple_token"))
+frontend/src/modules/auth/AuthContext.jsx:26:    sessionStorage.setItem("urban_ripple_token", result.access_token);
+frontend/src/modules/auth/AuthContext.jsx:32:    sessionStorage.removeItem("urban_ripple_token");
+frontend/src/services/mlService.js:5:  const token = localStorage.getItem("urban_ripple_token");
+frontend/src/services/emergencyService.js:5:  const token = localStorage.getItem("urban_ripple_token");
+frontend/src/services/analyticsService.js:4:  const token = localStorage.getItem("urban_ripple_token");
+
+1041–1050: API CONFIGURATION
+frontend/src/AppRouter.jsx:6:const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+frontend/src/auth/AuthScreen.jsx:3:const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+frontend/src/App.jsx:83:        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+frontend/src/App.jsx:123:      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+frontend/src/App.jsx:184:      const response = await fetch("http://127.0.0.1:8000/api/impact/analyze", {
+frontend/src/modules/PredictiveIntelligence.jsx:9:const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/mlService.js:2:  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/emergencyService.js:2:  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/authService.js:1:const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+frontend/src/services/analyticsService.js:1:const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+1051–1060: BACKEND ROUTES
+
+1061–1070: SECURITY DEPENDENCIES
+backend/intelligence/predictions.py:6:from security.roles import require_roles
+backend/intelligence/predictions.py:74:@router.get("/risk-scores", dependencies=[Depends(require_roles("admin", "official", "analyst"))])
+backend/intelligence/predictions.py:91:@router.get("/forecast", dependencies=[Depends(require_roles("admin", "official", "analyst"))])
+backend/intelligence/predictions.py:118:@router.get("/anomalies", dependencies=[Depends(require_roles("admin", "official", "analyst"))])
+backend/intelligence/predictions.py:152:@router.get("/recommendations", dependencies=[Depends(require_roles("admin", "official", "analyst"))])
+backend/intelligence/predictions.py:169:@router.get("/multi-hazard", dependencies=[Depends(require_roles("admin", "official", "analyst"))])
+backend/security/roles.py:56:def require_roles(*allowed_roles):
+backend/security/roles.py:71:def require_permission(permission):
+backend/security/permissions/dependencies.py:5:def require_roles(*allowed_roles):
+backend/security/permissions/dependencies.py:19:def require_permission(permission):
+backend/emergency/routes.py:9:from security.roles import require_roles
+backend/emergency/routes.py:72:    user=Depends(require_roles("admin", "official"))
+backend/emergency/routes.py:116:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/emergency/routes.py:135:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/emergency/routes.py:155:    user=Depends(require_roles("admin", "official"))
+backend/emergency/routes.py:205:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:7:from security.roles import require_roles
+backend/disruption_management/routes.py:64:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:118:    user=Depends(require_roles("admin", "official", "analyst"))
+backend/disruption_management/routes.py:128:    user=Depends(require_roles("admin", "official"))
+backend/disruption_management/routes.py:178:    user=Depends(require_roles("admin"))
+backend/analytics/routes.py:4:from security.roles import require_roles
+backend/analytics/routes.py:17:    user=Depends(require_roles("admin", "official", "analyst"))
+
+1071–1080: DATABASE CHECK
+Integrity: ok
+Foreign key violations: []
+Table: disruptions
+Table: emergency_incidents
+Table: sqlite_sequence
+Table: users
+
+1081–1090: BACKEND PYTHON VALIDATION
+Backend compile exit code: 0
+
+1091–1100: FRONTEND PRODUCTION BUILD
+
+> frontend@0.0.0 build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 2862 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          0.45 kB │ gzip:   0.29 kB
+dist/assets/index-C5WF3ZBA.css          33.20 kB │ gzip:  10.84 kB
+dist/assets/purify.es-Dqk5qvad.js       29.02 kB │ gzip:  11.45 kB
+dist/assets/index.es-CAaxC6hd.js       151.37 kB │ gzip:  48.88 kB
+dist/assets/html2canvas-D6i8qMlw.js    199.39 kB │ gzip:  46.73 kB
+dist/assets/index-CHGted6r.js        1,500.22 kB │ gzip: 463.57 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 518ms
+
+Build exit code: 0
+Audit report: reports/phase_1001_1100_20261101_113951.txt
+Backup directory: backups/phase_1001_1100_20261101_113951
+============================================
+STEPS 1001–1100 FINISHED
+============================================

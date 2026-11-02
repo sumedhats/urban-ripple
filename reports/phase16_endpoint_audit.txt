@@ -1,0 +1,860 @@
+==========================================
+URBAN RIPPLE — PHASE 16
+DETAILED ENDPOINT SECURITY AUDIT
+==========================================
+
+==========================================
+FILE: backend/disruption_management/routes.py
+==========================================
+from pathlib import Path
+import sqlite3
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from security.roles import require_roles
+
+router = APIRouter(
+    prefix="/api/management/disruptions",
+    tags=["Disruption Management"]
+)
+
+DB_PATH = Path(__file__).resolve().parents[1] / "urban_ripple.db"
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+class DisruptionUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=150)
+    location: str | None = Field(default=None, min_length=2, max_length=200)
+    disruption_type: str | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    duration_hours: float | None = Field(default=None, gt=0, le=720)
+    affected_population: int | None = Field(default=None, ge=0)
+    severity: str | None = None
+    status: str | None = None
+
+
+ALLOWED_SEVERITIES = {"Low", "Medium", "High", "Critical"}
+ALLOWED_STATUSES = {"Active", "Monitoring", "Planned", "Resolved", "Cancelled"}
+ALLOWED_TYPES = {
+    "Road Closure", "Water Outage", "Power Outage",
+    "Flooding", "Traffic Congestion", "Construction",
+    "Transport Interruption", "Public Event", "Other"
+}
+
+
+def fetch_record(conn, disruption_id):
+    row = conn.execute(
+        "SELECT * FROM disruptions WHERE id = ?",
+        (disruption_id,)
+    ).fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Disruption not found")
+
+    return dict(row)
+
+
+@router.get("")
+def list_managed_disruptions(
+    search: str = Query(default="", max_length=150),
+    severity: str | None = None,
+    status: str | None = None,
+    disruption_type: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    user=Depends(require_roles("admin", "official", "analyst"))
+):
+    conditions = []
+    values = []
+
+    if search.strip():
+        term = f"%{search.strip()}%"
+        conditions.append("(title LIKE ? OR location LIKE ?)")
+        values.extend([term, term])
+
+    if severity:
+        if severity not in ALLOWED_SEVERITIES:
+            raise HTTPException(status_code=422, detail="Invalid severity")
+        conditions.append("severity = ?")
+        values.append(severity)
+
+    if status:
+        if status not in ALLOWED_STATUSES:
+            raise HTTPException(status_code=422, detail="Invalid status")
+        conditions.append("status = ?")
+        values.append(status)
+
+    if disruption_type:
+        if disruption_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=422, detail="Invalid disruption type")
+        conditions.append("disruption_type = ?")
+        values.append(disruption_type)
+
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    with get_connection() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM disruptions" + where,
+            values
+        ).fetchone()[0]
+
+        records = conn.execute(
+            "SELECT * FROM disruptions" + where +
+            " ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            values + [page_size, (page - 1) * page_size]
+        ).fetchall()
+
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "pages": (total + page_size - 1) // page_size,
+        "results": [dict(row) for row in records]
+    }
+
+
+@router.get("/{disruption_id}")
+def get_managed_disruption(
+    disruption_id: str,
+    user=Depends(require_roles("admin", "official", "analyst"))
+):
+    with get_connection() as conn:
+        return fetch_record(conn, disruption_id)
+
+
+@router.patch("/{disruption_id}")
+def update_disruption(
+    disruption_id: str,
+    data: DisruptionUpdate,
+    user=Depends(require_roles("admin", "official"))
+):
+    changes = data.model_dump(exclude_unset=True)
+
+    if not changes:
+        raise HTTPException(status_code=400, detail="No changes supplied")
+
+    if "severity" in changes and changes["severity"] not in ALLOWED_SEVERITIES:
+        raise HTTPException(status_code=422, detail="Invalid severity")
+
+    if "status" in changes and changes["status"] not in ALLOWED_STATUSES:
+        raise HTTPException(status_code=422, detail="Invalid status")
+
+    if (
+        "disruption_type" in changes
+        and changes["disruption_type"] not in ALLOWED_TYPES
+    ):
+        raise HTTPException(status_code=422, detail="Invalid disruption type")
+
+    allowed_columns = {
+        "title", "location", "disruption_type", "latitude",
+        "longitude", "duration_hours", "affected_population",
+        "severity", "status"
+    }
+
+    if not set(changes).issubset(allowed_columns):
+        raise HTTPException(status_code=400, detail="Invalid update fields")
+
+    assignments = ", ".join(f"{column} = ?" for column in changes)
+    values = list(changes.values()) + [disruption_id]
+
+    with get_connection() as conn:
+        fetch_record(conn, disruption_id)
+
+        conn.execute(
+            f"UPDATE disruptions SET {assignments} WHERE id = ?",
+            values
+        )
+
+        updated = fetch_record(conn, disruption_id)
+
+    return {
+        "message": "Disruption updated successfully",
+        "disruption": updated
+    }
+
+
+@router.delete("/{disruption_id}")
+def delete_disruption(
+    disruption_id: str,
+    user=Depends(require_roles("admin"))
+):
+    with get_connection() as conn:
+        fetch_record(conn, disruption_id)
+
+        conn.execute(
+            "DELETE FROM disruptions WHERE id = ?",
+            (disruption_id,)
+        )
+
+    return {"message": "Disruption deleted successfully"}
+
+==========================================
+FILE: backend/emergency/routes.py
+==========================================
+from pathlib import Path
+from datetime import datetime, timezone
+from uuid import uuid4
+import sqlite3
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from security.roles import require_roles
+
+router = APIRouter(
+    prefix="/api/emergency",
+    tags=["Emergency Management"]
+)
+
+DB_PATH = Path(__file__).resolve().parents[1] / "urban_ripple.db"
+
+STATUSES = {
+    "reported",
+    "acknowledged",
+    "assigned",
+    "in_progress",
+    "resolved",
+    "closed"
+}
+
+PRIORITIES = {"low", "medium", "high", "critical"}
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def initialize_tables():
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS emergency_incidents (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                location TEXT NOT NULL,
+                incident_type TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                status TEXT NOT NULL,
+                assigned_team TEXT,
+                reported_by TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+
+class IncidentCreate(BaseModel):
+    title: str = Field(min_length=3, max_length=150)
+    description: str = Field(min_length=5, max_length=2000)
+    location: str = Field(min_length=2, max_length=250)
+    incident_type: str = Field(min_length=2, max_length=80)
+    priority: str = "medium"
+
+
+class IncidentUpdate(BaseModel):
+    status: str | None = None
+    priority: str | None = None
+    assigned_team: str | None = Field(default=None, max_length=150)
+
+
+@router.post("/incidents", status_code=201)
+def create_incident(
+    data: IncidentCreate,
+    user=Depends(require_roles("admin", "official"))
+):
+    initialize_tables()
+
+    priority = data.priority.lower()
+
+    if priority not in PRIORITIES:
+        raise HTTPException(422, "Invalid incident priority.")
+
+    incident_id = str(uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as conn:
+        conn.execute("""
+            INSERT INTO emergency_incidents (
+                id, title, description, location,
+                incident_type, priority, status,
+                assigned_team, reported_by,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            incident_id,
+            data.title.strip(),
+            data.description.strip(),
+            data.location.strip(),
+            data.incident_type.strip(),
+            priority,
+            "reported",
+            None,
+            user.get("email"),
+            now,
+            now
+        ))
+
+    return {
+        "message": "Emergency incident registered.",
+        "incident_id": incident_id,
+        "status": "reported"
+    }
+
+
+@router.get("/incidents")
+def list_incidents(
+    user=Depends(require_roles("admin", "official", "analyst"))
+):
+    initialize_tables()
+
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT * FROM emergency_incidents
+            ORDER BY created_at DESC
+        """).fetchall()
+
+    return {
+        "total": len(rows),
+        "incidents": [dict(row) for row in rows]
+    }
+
+
+@router.get("/incidents/{incident_id}")
+def get_incident(
+    incident_id: str,
+    user=Depends(require_roles("admin", "official", "analyst"))
+):
+    initialize_tables()
+
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM emergency_incidents WHERE id = ?",
+            (incident_id,)
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(404, "Incident not found.")
+
+    return dict(row)
+
+
+@router.patch("/incidents/{incident_id}")
+def update_incident(
+    incident_id: str,
+    data: IncidentUpdate,
+    user=Depends(require_roles("admin", "official"))
+):
+    initialize_tables()
+
+    changes = data.model_dump(exclude_unset=True)
+
+    if not changes:
+        raise HTTPException(400, "No update fields supplied.")
+
+    if "status" in changes and changes["status"] is not None:
+        changes["status"] = changes["status"].lower()
+        if changes["status"] not in STATUSES:
+            raise HTTPException(422, "Invalid incident status.")
+
+    if "priority" in changes and changes["priority"] is not None:
+        changes["priority"] = changes["priority"].lower()
+        if changes["priority"] not in PRIORITIES:
+            raise HTTPException(422, "Invalid incident priority.")
+
+    allowed = {"status", "priority", "assigned_team"}
+    if not set(changes).issubset(allowed):
+        raise HTTPException(400, "Unsupported update field.")
+
+    changes["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    columns = ", ".join(f"{key} = ?" for key in changes)
+    values = list(changes.values()) + [incident_id]
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            f"UPDATE emergency_incidents SET {columns} WHERE id = ?",
+            values
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(404, "Incident not found.")
+
+        row = conn.execute(
+            "SELECT * FROM emergency_incidents WHERE id = ?",
+            (incident_id,)
+        ).fetchone()
+
+    return {
+        "message": "Incident updated successfully.",
+        "incident": dict(row)
+    }
+
+
+@router.get("/summary")
+def emergency_summary(
+    user=Depends(require_roles("admin", "official", "analyst"))
+):
+    initialize_tables()
+
+    with get_connection() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM emergency_incidents"
+        ).fetchone()[0]
+
+        statuses = conn.execute("""
+            SELECT status, COUNT(*) AS count
+            FROM emergency_incidents
+            GROUP BY status
+        """).fetchall()
+
+        priorities = conn.execute("""
+            SELECT priority, COUNT(*) AS count
+            FROM emergency_incidents
+            GROUP BY priority
+        """).fetchall()
+
+    return {
+        "total_incidents": total,
+        "by_status": {row["status"]: row["count"] for row in statuses},
+        "by_priority": {
+            row["priority"]: row["count"] for row in priorities
+        }
+    }
+
+==========================================
+FILE: backend/analytics/routes.py
+==========================================
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from security.roles import require_roles
+from analytics.service import get_analytics
+
+router = APIRouter(
+    prefix="/api/analytics",
+    tags=["Analytics"]
+)
+
+
+@router.get("/overview")
+def analytics_overview(
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    user=Depends(require_roles("admin", "official", "analyst"))
+):
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="Start date cannot be after end date."
+        )
+
+    return get_analytics(
+        start_date.isoformat() if start_date else None,
+        end_date.isoformat() if end_date else None
+    )
+
+==========================================
+FILE: backend/intelligence/predictions.py
+==========================================
+
+from pathlib import Path
+import sqlite3
+from collections import defaultdict
+from fastapi import APIRouter, HTTPException, Query
+
+router = APIRouter(prefix="/api/intelligence", tags=["Predictive Intelligence"])
+DB_PATH = Path(__file__).resolve().parents[1] / "urban_ripple.db"
+
+SEVERITY_WEIGHT = {
+    "low": 10,
+    "medium": 30,
+    "high": 60,
+    "critical": 85
+}
+
+def load_disruptions():
+    if not DB_PATH.exists():
+        raise HTTPException(status_code=503, detail="Disruption database unavailable")
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT id, title, disruption_type, location,
+                       latitude, longitude, duration_hours,
+                       affected_population, severity, status, created_at
+                FROM disruptions
+            """).fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as exc:
+        raise HTTPException(status_code=500, detail="Could not read disruption records") from exc
+
+def calculate_risk(record):
+    severity = SEVERITY_WEIGHT.get(str(record.get("severity", "")).lower(), 15)
+    population = max(0, int(record.get("affected_population") or 0))
+    duration = max(0, float(record.get("duration_hours") or 0))
+    population_score = min(100, population / 1000 * 10)
+    duration_score = min(100, duration / 24 * 20)
+    score = min(100, severity * 0.60 + population_score * 0.25 + duration_score * 0.15)
+    return round(score, 2)
+
+def risk_level(score):
+    if score >= 75:
+        return "Critical"
+    if score >= 50:
+        return "High"
+    if score >= 25:
+        return "Moderate"
+    return "Low"
+
+def recommendations(record, score):
+    result = []
+    severity = str(record.get("severity", "")).lower()
+    kind = str(record.get("disruption_type", "")).lower()
+
+    if score >= 75:
+        result.append({"priority": "Urgent", "action": "Request immediate review by the responsible emergency authority."})
+    elif score >= 50:
+        result.append({"priority": "High", "action": "Prioritize monitoring and confirm response-team readiness."})
+    else:
+        result.append({"priority": "Normal", "action": "Continue monitoring and update incident information."})
+
+    if "road" in kind or "traffic" in kind:
+        result.append({"priority": "High", "action": "Review traffic diversions and emergency vehicle access."})
+    if "water" in kind or "flood" in kind:
+        result.append({"priority": "High", "action": "Review water-service continuity and potential flood exposure."})
+    if "power" in kind or "electric" in kind:
+        result.append({"priority": "High", "action": "Identify critical facilities that may need backup power."})
+    if severity == "critical":
+        result.append({"priority": "Urgent", "action": "Verify incident status and communicate confirmed safety information."})
+    return result
+
+@router.get("/risk-scores")
+def get_risk_scores():
+    records = load_disruptions()
+    results = []
+    for record in records:
+        score = calculate_risk(record)
+        results.append({
+            "disruption_id": record["id"],
+            "title": record["title"],
+            "location": record["location"],
+            "disruption_type": record["disruption_type"],
+            "risk_score": score,
+            "risk_level": risk_level(score)
+        })
+    results.sort(key=lambda item: item["risk_score"], reverse=True)
+    return {"count": len(results), "method": "Transparent heuristic baseline", "results": results}
+
+@router.get("/forecast")
+def forecast_impact(horizon_hours: int = Query(default=6, ge=1, le=168)):
+    records = load_disruptions()
+    forecasts = []
+    for record in records:
+        base = calculate_risk(record)
+        duration = max(0, float(record.get("duration_hours") or 0))
+        time_factor = min(1.5, 0.75 + horizon_hours / 48)
+        duration_factor = min(1.25, 0.75 + duration / 96)
+        projected = min(100, round(base * time_factor * duration_factor, 2))
+        forecasts.append({
+            "disruption_id": record["id"],
+            "title": record["title"],
+            "location": record["location"],
+            "forecast_horizon_hours": horizon_hours,
+            "baseline_risk": base,
+            "projected_risk": projected,
+            "projected_level": risk_level(projected)
+        })
+    forecasts.sort(key=lambda item: item["projected_risk"], reverse=True)
+    return {
+        "forecast_horizon_hours": horizon_hours,
+        "method": "Heuristic scenario projection, not a trained forecasting model",
+        "count": len(forecasts),
+        "results": forecasts
+    }
+
+@router.get("/anomalies")
+def detect_anomalies():
+    records = load_disruptions()
+    if not records:
+        return {"count": 0, "results": [], "message": "No disruption records available."}
+
+    populations = [max(0, int(r.get("affected_population") or 0)) for r in records]
+    mean = sum(populations) / len(populations)
+    variance = sum((x - mean) ** 2 for x in populations) / len(populations)
+    deviation = variance ** 0.5
+    anomalies = []
+
+    for record in records:
+        population = max(0, int(record.get("affected_population") or 0))
+        reasons = []
+        if deviation > 0 and population > mean + 2 * deviation:
+            reasons.append("Affected population is unusually high relative to the current records.")
+        if float(record.get("duration_hours") or 0) >= 72:
+            reasons.append("Disruption duration is at least 72 hours.")
+        if str(record.get("severity", "")).lower() == "critical":
+            reasons.append("Incident is marked Critical.")
+        if reasons:
+            anomalies.append({
+                "disruption_id": record["id"],
+                "title": record["title"],
+                "location": record["location"],
+                "reasons": reasons
+            })
+    return {
+        "count": len(anomalies),
+        "method": "Rule-based and statistical screening",
+        "results": anomalies
+    }
+
+@router.get("/recommendations")
+def ranked_recommendations():
+    records = load_disruptions()
+    items = []
+    for record in records:
+        score = calculate_risk(record)
+        items.append({
+            "disruption_id": record["id"],
+            "title": record["title"],
+            "location": record["location"],
+            "risk_score": score,
+            "risk_level": risk_level(score),
+            "recommendations": recommendations(record, score)
+        })
+    items.sort(key=lambda item: item["risk_score"], reverse=True)
+    return {"count": len(items), "results": items}
+
+@router.get("/multi-hazard")
+def multi_hazard_analysis():
+    records = load_disruptions()
+    groups = defaultdict(list)
+    for record in records:
+        location = str(record.get("location") or "Unknown").strip().lower()
+        groups[location].append(record)
+
+    results = []
+    for location, incidents in groups.items():
+        types = sorted(set(str(r.get("disruption_type") or "Unknown") for r in incidents))
+        combined = min(100, round(sum(calculate_risk(r) for r in incidents), 2))
+        results.append({
+            "location": location,
+            "incident_count": len(incidents),
+            "hazard_types": types,
+            "multiple_hazard_types": len(types) > 1,
+            "combined_exposure_score": combined,
+            "note": "Co-located incident screening; not a validated cascading-failure model."
+        })
+    results.sort(key=lambda x: x["combined_exposure_score"], reverse=True)
+    return {"count": len(results), "results": results}
+
+==========================================
+FILE: backend/security/permissions/dependencies.py
+==========================================
+from fastapi import Depends, HTTPException, status
+from security.auth import get_current_user
+from security.roles import normalize_role, has_permission
+
+def require_roles(*allowed_roles):
+    allowed = {normalize_role(role) for role in allowed_roles}
+
+    def role_checker(current_user=Depends(get_current_user)):
+        role = normalize_role(current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None))
+        if role not in allowed and role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this resource."
+            )
+        return current_user
+
+    return role_checker
+
+def require_permission(permission):
+    def permission_checker(current_user=Depends(get_current_user)):
+        role = current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None)
+        if not has_permission(role, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission required: " + permission
+            )
+        return current_user
+
+    return permission_checker
+
+==========================================
+FRONTEND AUTHENTICATION ROUTING
+==========================================
+
+FILE: frontend/src/AppRouter.jsx
+import { useEffect, useState } from "react";
+import App from "./App.jsx";
+import AuthScreen from "./auth/AuthScreen.jsx";
+import RolePortal from "./portals/RolePortal.jsx";
+
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+export default function AppRouter() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifySession() {
+      const token = localStorage.getItem("urban_ripple_token");
+
+      if (!token) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Session expired");
+
+        const data = await response.json();
+        if (active) setUser(data.user);
+      } catch {
+        localStorage.removeItem("urban_ripple_token");
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    verifySession();
+    return () => { active = false; };
+  }, []);
+
+  function logout() {
+    localStorage.removeItem("urban_ripple_token");
+    setUser(null);
+    setWorkspace(false);
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40, fontFamily: "Arial" }}>Verifying session...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={setUser} />;
+  }
+
+  if (!workspace) {
+    return (
+      <RolePortal
+        user={user}
+        onOpenWorkspace={() => setWorkspace(true)}
+        onLogout={logout}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        padding: "10px 20px",
+        background: "#f1f1fa",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <span>Signed in: {user.name} ({user.role})</span>
+        <button onClick={() => setWorkspace(false)}>Portal</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+      <App />
+    </div>
+  );
+}
+
+FILE: frontend/src/modules/auth/AuthGate.jsx
+import { useAuth } from "./AuthContext";
+import AuthScreen from "./AuthScreen";
+
+export default function AuthGate({ children }) {
+  const { user, loading, logout } = useAuth();
+
+  if (loading) {
+    return <div className="auth-page">Loading URBAN RIPPLE...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  return (
+    <>
+      <div className="auth-user-bar">
+        <span>
+          {user.name} · {user.role}
+        </span>
+        <button onClick={logout}>Logout</button>
+      </div>
+      {children}
+    </>
+  );
+}
+
+FILE: frontend/src/modules/auth/AuthContext.jsx
+import { createContext, useContext, useEffect, useState } from "react";
+import { getMyProfile, loginUser } from "../../services/authService";
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("urban_ripple_token");
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    getMyProfile(token)
+      .then(setUser)
+      .catch(() => sessionStorage.removeItem("urban_ripple_token"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function login(email, password) {
+    const result = await loginUser({ email, password });
+    sessionStorage.setItem("urban_ripple_token", result.access_token);
+    setUser(result.user);
+    return result.user;
+  }
+
+  function logout() {
+    sessionStorage.removeItem("urban_ripple_token");
+    setUser(null);
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be inside AuthProvider");
+  return context;
+}
+
+PHASE 16 AUDIT COMPLETE

@@ -1,0 +1,609 @@
+================================================
+URBAN RIPPLE — 100-POINT DEVELOPMENT AUDIT
+================================================
+Date: Sun Nov  1 11:22:33 IST 2026
+Project: /Users/apple/Desktop/urban-ripple
+
+SECTION 1 — PROJECT STRUCTURE
+backend/__pycache__/main_backup.cpython-314.pyc
+backend/__pycache__/main_before_impact_upgrade.cpython-314.pyc
+backend/__pycache__/main_before_sqlite.cpython-314.pyc
+backend/__pycache__/main.cpython-314.pyc
+backend/.env
+backend/.env.example
+backend/admin/__init__.py
+backend/admin/__pycache__/__init__.cpython-314.pyc
+backend/admin/__pycache__/departments.cpython-314.pyc
+backend/admin/__pycache__/users.cpython-314.pyc
+backend/admin/departments.py
+backend/admin/users.py
+backend/ai_assistant/__init__.py
+backend/ai_assistant/__pycache__/__init__.cpython-314.pyc
+backend/ai_assistant/__pycache__/summarizer.cpython-314.pyc
+backend/ai_assistant/summarizer.py
+backend/alerts/__init__.py
+backend/alerts/__pycache__/__init__.cpython-314.pyc
+backend/alerts/__pycache__/routes.cpython-314.pyc
+backend/alerts/routes.py
+backend/analytics/__init__.py
+backend/analytics/__pycache__/__init__.cpython-314.pyc
+backend/analytics/__pycache__/city_metrics.cpython-314.pyc
+backend/analytics/__pycache__/prediction_metrics.cpython-314.pyc
+backend/analytics/__pycache__/routes.cpython-314.pyc
+backend/analytics/__pycache__/service.cpython-314.pyc
+backend/analytics/city_metrics.py
+backend/analytics/prediction_metrics.py
+backend/analytics/routes.py
+backend/analytics/service.py
+backend/audit/__init__.py
+backend/audit/__pycache__/__init__.cpython-314.pyc
+backend/audit/__pycache__/logger.cpython-314.pyc
+backend/audit/logger.py
+backend/auth/__init__.py
+backend/auth/__pycache__/__init__.cpython-314.pyc
+backend/auth/__pycache__/security.cpython-314.pyc
+backend/auth/security.py
+backend/citizen/__init__.py
+backend/citizen/__pycache__/__init__.cpython-314.pyc
+backend/citizen/__pycache__/routes.cpython-314.pyc
+backend/citizen/routes.py
+backend/city_comparison/__init__.py
+backend/city_comparison/__pycache__/__init__.cpython-314.pyc
+backend/city_comparison/__pycache__/analysis.cpython-314.pyc
+backend/city_comparison/analysis.py
+backend/collaboration/__init__.py
+backend/collaboration/__pycache__/__init__.cpython-314.pyc
+backend/collaboration/__pycache__/routes.cpython-314.pyc
+backend/collaboration/routes.py
+backend/database/__init__.py
+backend/database/__pycache__/__init__.cpython-314.pyc
+backend/database/__pycache__/backup.cpython-314.pyc
+backend/database/__pycache__/restore.cpython-314.pyc
+backend/database/backup.py
+backend/database/restore.py
+backend/decision_support/__init__.py
+backend/decision_support/__pycache__/__init__.cpython-314.pyc
+backend/decision_support/__pycache__/engine.cpython-314.pyc
+backend/decision_support/__pycache__/routes.cpython-314.pyc
+backend/decision_support/engine.py
+backend/decision_support/routes.py
+backend/departments/__init__.py
+backend/departments/__pycache__/__init__.cpython-314.pyc
+backend/departments/__pycache__/routes.cpython-314.pyc
+backend/departments/routes.py
+backend/dependencies/__init__.py
+backend/dependencies/__pycache__/__init__.cpython-314.pyc
+backend/dependencies/__pycache__/graph.cpython-314.pyc
+backend/dependencies/graph.py
+backend/digital_twin/__init__.py
+backend/digital_twin/__pycache__/__init__.cpython-314.pyc
+backend/digital_twin/__pycache__/engine.cpython-314.pyc
+backend/digital_twin/engine.py
+backend/disruption_management/__init__.py
+backend/disruption_management/__pycache__/__init__.cpython-314.pyc
+backend/disruption_management/__pycache__/routes.cpython-314.pyc
+backend/disruption_management/routes.py
+backend/Dockerfile
+backend/emergency/__init__.py
+backend/emergency/__pycache__/__init__.cpython-314.pyc
+backend/emergency/__pycache__/response.cpython-314.pyc
+backend/emergency/__pycache__/routes.cpython-314.pyc
+backend/emergency/response.py
+backend/emergency/routes.py
+backend/environment/__init__.py
+backend/environment/__pycache__/__init__.cpython-314.pyc
+backend/environment/__pycache__/analysis.cpython-314.pyc
+backend/environment/analysis.py
+backend/executive/__init__.py
+backend/executive/__pycache__/__init__.cpython-314.pyc
+backend/executive/__pycache__/metrics.cpython-314.pyc
+backend/executive/metrics.py
+backend/external_data/__pycache__/traffic.cpython-314.pyc
+backend/external_data/__pycache__/weather.cpython-314.pyc
+backend/external_data/traffic.py
+backend/external_data/weather.py
+backend/geospatial/__init__.py
+backend/geospatial/__pycache__/__init__.cpython-314.pyc
+backend/geospatial/__pycache__/analysis.cpython-314.pyc
+backend/geospatial/analysis.py
+backend/health/__init__.py
+backend/health/__pycache__/__init__.cpython-314.pyc
+backend/health/__pycache__/checks.cpython-314.pyc
+backend/health/checks.py
+backend/heatmap/__init__.py
+backend/heatmap/__pycache__/__init__.cpython-314.pyc
+backend/heatmap/__pycache__/analysis.cpython-314.pyc
+backend/heatmap/analysis.py
+backend/historical/__init__.py
+backend/historical/__pycache__/__init__.cpython-314.pyc
+backend/historical/__pycache__/analysis.cpython-314.pyc
+backend/historical/analysis.py
+backend/infrastructure/__init__.py
+backend/infrastructure/__pycache__/__init__.cpython-314.pyc
+backend/infrastructure/__pycache__/routes.cpython-314.pyc
+backend/infrastructure/routes.py
+backend/integrations/__init__.py
+backend/integrations/__pycache__/__init__.cpython-314.pyc
+backend/integrations/__pycache__/infrastructure.cpython-314.pyc
+backend/integrations/__pycache__/traffic.cpython-314.pyc
+backend/integrations/__pycache__/weather.cpython-314.pyc
+backend/integrations/infrastructure.py
+backend/integrations/traffic.py
+backend/integrations/weather.py
+backend/intelligence/__init__.py
+backend/intelligence/__pycache__/__init__.cpython-314.pyc
+backend/intelligence/__pycache__/predictions.cpython-314.pyc
+backend/intelligence/predictions.py
+backend/knowledge_graph/__init__.py
+backend/knowledge_graph/__pycache__/__init__.cpython-314.pyc
+backend/knowledge_graph/__pycache__/schema.cpython-314.pyc
+backend/knowledge_graph/schema.py
+backend/main_backup.py
+backend/main_before_impact_upgrade.py
+backend/main_before_sqlite.py
+backend/main.py
+backend/maintenance/__init__.py
+backend/maintenance/__pycache__/__init__.cpython-314.pyc
+backend/maintenance/__pycache__/engine.cpython-314.pyc
+backend/maintenance/engine.py
+backend/ml/__init__.py
+backend/ml/__pycache__/__init__.cpython-314.pyc
+backend/ml/__pycache__/train.cpython-314.pyc
+backend/ml/train.py
+backend/mobility/__init__.py
+backend/mobility/__pycache__/__init__.cpython-314.pyc
+backend/mobility/__pycache__/analysis.cpython-314.pyc
+backend/mobility/analysis.py
+backend/monitoring/__init__.py
+backend/monitoring/__pycache__/__init__.cpython-314.pyc
+backend/monitoring/__pycache__/incident_monitor.cpython-314.pyc
+backend/monitoring/incident_monitor.py
+backend/notifications/__init__.py
+backend/notifications/__pycache__/__init__.cpython-314.pyc
+backend/notifications/__pycache__/routes.cpython-314.pyc
+backend/notifications/__pycache__/service.cpython-314.pyc
+backend/notifications/routes.py
+backend/notifications/service.py
+backend/official/__init__.py
+backend/official/__pycache__/__init__.cpython-314.pyc
+backend/official/__pycache__/incident_management.cpython-314.pyc
+backend/official/incident_management.py
+backend/performance/__init__.py
+backend/performance/__pycache__/__init__.cpython-314.pyc
+backend/performance/__pycache__/cache.cpython-314.pyc
+backend/performance/__pycache__/metrics.cpython-314.pyc
+backend/performance/cache.py
+backend/performance/metrics.py
+backend/public_api/__init__.py
+backend/public_api/__pycache__/__init__.cpython-314.pyc
+backend/public_api/__pycache__/alerts.cpython-314.pyc
+backend/public_api/__pycache__/reports.cpython-314.pyc
+backend/public_api/__pycache__/routes.cpython-314.pyc
+backend/public_api/alerts.py
+backend/public_api/reports.py
+backend/public_api/routes.py
+backend/requirements.txt
+backend/resilience/__init__.py
+backend/resilience/__pycache__/__init__.cpython-314.pyc
+backend/resilience/__pycache__/scoring.cpython-314.pyc
+backend/resilience/scoring.py
+backend/resources/__init__.py
+backend/resources/__pycache__/__init__.cpython-314.pyc
+backend/resources/__pycache__/routes.cpython-314.pyc
+backend/resources/routes.py
+backend/scenarios/__init__.py
+backend/scenarios/__pycache__/__init__.cpython-314.pyc
+backend/scenarios/__pycache__/routes.cpython-314.pyc
+backend/scenarios/__pycache__/simulator.cpython-314.pyc
+backend/scenarios/routes.py
+backend/scenarios/simulator.py
+backend/security/__init__.py
+backend/security/__pycache__/__init__.cpython-314.pyc
+backend/security/__pycache__/auth.cpython-314.pyc
+backend/security/__pycache__/roles.cpython-314.pyc
+backend/security/auth.py
+backend/security/permissions/__init__.py
+backend/security/permissions/__pycache__/__init__.cpython-314.pyc
+backend/security/permissions/__pycache__/dependencies.cpython-314.pyc
+backend/security/permissions/dependencies.py
+backend/security/roles.py
+backend/settings/__init__.py
+backend/settings/__pycache__/__init__.cpython-314.pyc
+backend/settings/__pycache__/routes.cpython-314.pyc
+backend/settings/routes.py
+backend/simulation/__init__.py
+backend/simulation/__pycache__/__init__.cpython-314.pyc
+backend/simulation/__pycache__/engine.cpython-314.pyc
+backend/simulation/engine.py
+backend/tasks/__init__.py
+backend/tasks/__pycache__/__init__.cpython-314.pyc
+backend/tasks/__pycache__/routes.cpython-314.pyc
+backend/tasks/routes.py
+backend/tests/__init__.py
+backend/tests/__pycache__/__init__.cpython-314.pyc
+backend/tests/__pycache__/test_disruptions.cpython-314.pyc
+backend/tests/__pycache__/test_impact.cpython-314.pyc
+backend/tests/test_disruptions.py
+backend/tests/test_impact.py
+backend/timeline/__init__.py
+backend/timeline/__pycache__/__init__.cpython-314.pyc
+backend/timeline/__pycache__/routes.cpython-314.pyc
+backend/timeline/routes.py
+backend/urban_ripple.db
+backend/users/__init__.py
+backend/users/__pycache__/__init__.cpython-314.pyc
+backend/users/__pycache__/routes.cpython-314.pyc
+backend/users/routes.py
+backend/validators/__init__.py
+backend/validators/__pycache__/__init__.cpython-314.pyc
+backend/validators/__pycache__/disruption_validator.cpython-314.pyc
+backend/validators/disruption_validator.py
+backend/venv/.gitignore
+backend/venv/bin/activate
+backend/venv/bin/activate.csh
+backend/venv/bin/activate.fish
+backend/venv/bin/Activate.ps1
+backend/venv/bin/cffi-gen-src
+backend/venv/bin/dotenv
+backend/venv/bin/email_validator
+backend/venv/bin/f2py
+backend/venv/bin/fastapi
+backend/venv/bin/httpx
+backend/venv/bin/idna
+backend/venv/bin/numpy-config
+backend/venv/bin/pip
+backend/venv/bin/pip3
+backend/venv/bin/pip3.14
+backend/venv/bin/uvicorn
+backend/venv/pyvenv.cfg
+backend/vulnerability/__init__.py
+backend/vulnerability/__pycache__/__init__.cpython-314.pyc
+backend/vulnerability/__pycache__/assessment.cpython-314.pyc
+backend/vulnerability/assessment.py
+backend/water_risk/__init__.py
+backend/water_risk/__pycache__/__init__.cpython-314.pyc
+backend/water_risk/__pycache__/model.cpython-314.pyc
+backend/water_risk/model.py
+backend/workflows/__init__.py
+backend/workflows/__pycache__/__init__.cpython-314.pyc
+backend/workflows/__pycache__/routes.cpython-314.pyc
+backend/workflows/routes.py
+frontend/src/App_backup.jsx
+frontend/src/App_before_analytics.jsx
+frontend/src/App_before_form_upgrade.jsx
+frontend/src/App_before_impact_ui.jsx
+frontend/src/App_before_live_map.jsx
+frontend/src/App_before_url_fix.jsx
+frontend/src/App.css
+frontend/src/App.jsx
+frontend/src/AppRouter.jsx
+frontend/src/assets/hero.png
+frontend/src/assets/react.svg
+frontend/src/assets/vite.svg
+frontend/src/auth/AuthScreen.jsx
+frontend/src/index.css
+frontend/src/locales/en.json
+frontend/src/locales/hi.json
+frontend/src/locales/kn.json
+frontend/src/main.jsx
+frontend/src/modules/accessibility/AccessibilitySettings.jsx
+frontend/src/modules/admin/AdminDashboard.jsx
+frontend/src/modules/admin/DepartmentManagement.jsx
+frontend/src/modules/admin/SystemSettings.jsx
+frontend/src/modules/admin/UserManagement.jsx
+frontend/src/modules/ai-assistant/AIAssistant.jsx
+frontend/src/modules/alerts/AlertCentre.jsx
+frontend/src/modules/analyst/AnalystDashboard.jsx
+frontend/src/modules/analyst/CityPerformance.jsx
+frontend/src/modules/analyst/ImpactWorkspace.jsx
+frontend/src/modules/analyst/PredictionEvaluation.jsx
+frontend/src/modules/Analytics.jsx
+frontend/src/modules/analytics/AnalyticsDashboard.css
+frontend/src/modules/analytics/AnalyticsDashboard.jsx
+frontend/src/modules/analytics/charts/AnalyticsCharts.css
+frontend/src/modules/analytics/charts/AnalyticsCharts.jsx
+frontend/src/modules/audit/ActivityLogs.jsx
+frontend/src/modules/audit/AuditLogs.jsx
+frontend/src/modules/auth/Auth.css
+frontend/src/modules/auth/AuthContext.jsx
+frontend/src/modules/auth/AuthGate.jsx
+frontend/src/modules/auth/AuthScreen.jsx
+frontend/src/modules/auth/ForgotPassword.jsx
+frontend/src/modules/auth/Login.jsx
+frontend/src/modules/auth/Register.jsx
+frontend/src/modules/citizen/CitizenPortal.jsx
+frontend/src/modules/city-comparison/CityComparison.jsx
+frontend/src/modules/collaboration/CollaborationCentre.jsx
+frontend/src/modules/command/CommandCentre.jsx
+frontend/src/modules/DecisionSupport.jsx
+frontend/src/modules/departments/DepartmentManagement.jsx
+frontend/src/modules/dependencies/DependencyMap.jsx
+frontend/src/modules/digital-twin/DigitalTwin.jsx
+frontend/src/modules/emergency/EmergencyDashboard.css
+frontend/src/modules/emergency/EmergencyDashboard.jsx
+frontend/src/modules/emergency/EmergencyResponse.jsx
+frontend/src/modules/emergency/ResponseTeams.jsx
+frontend/src/modules/environment/EnvironmentalIntelligence.jsx
+frontend/src/modules/executive/ExecutiveDashboard.jsx
+frontend/src/modules/external-data/ExternalData.jsx
+frontend/src/modules/GeospatialIntelligence.jsx
+frontend/src/modules/heatmap/RiskHeatmap.jsx
+frontend/src/modules/HistoricalAnalysis.jsx
+frontend/src/modules/infrastructure/Infrastructure.jsx
+frontend/src/modules/LocationIntelligence.jsx
+frontend/src/modules/maintenance/PredictiveMaintenance.jsx
+frontend/src/modules/ml/MLDashboard.css
+frontend/src/modules/ml/MLDashboard.jsx
+frontend/src/modules/mobility/MobilityIntelligence.jsx
+frontend/src/modules/monitoring/IncidentTimeline.jsx
+frontend/src/modules/monitoring/LiveMonitoring.jsx
+frontend/src/modules/notifications/NotificationBell.jsx
+frontend/src/modules/notifications/NotificationCentre.jsx
+frontend/src/modules/official/DisruptionManagement.jsx
+frontend/src/modules/official/EmergencyAssignments.jsx
+frontend/src/modules/official/IncidentApproval.jsx
+frontend/src/modules/official/OfficialDashboard.jsx
+frontend/src/modules/performance/PerformanceDashboard.jsx
+frontend/src/modules/permissions/PermissionGuard.jsx
+frontend/src/modules/permissions/RoleManager.jsx
+frontend/src/modules/PredictiveInsights.jsx
+frontend/src/modules/PredictiveIntelligence.jsx
+frontend/src/modules/public/PublicAlerts.jsx
+frontend/src/modules/public/PublicDashboard.jsx
+frontend/src/modules/public/ReportDisruption.jsx
+frontend/src/modules/public/TrackDisruption.jsx
+frontend/src/modules/RecommendationEngine.jsx
+frontend/src/modules/Reports.jsx
+frontend/src/modules/resilience/ResilienceDashboard.jsx
+frontend/src/modules/ResourceAllocation.jsx
+frontend/src/modules/RippleEffects.jsx
+frontend/src/modules/RolePortals.jsx
+frontend/src/modules/SAPIntegration.jsx
+frontend/src/modules/ScenarioSimulator.jsx
+frontend/src/modules/settings/SystemSettings.jsx
+frontend/src/modules/system-health/SystemHealth.jsx
+frontend/src/modules/tasks/TaskManagement.jsx
+frontend/src/modules/timeline/IncidentTimeline.jsx
+frontend/src/modules/VulnerabilityAssessment.jsx
+frontend/src/modules/water-risk/WaterRisk.jsx
+frontend/src/portals/RolePortal.jsx
+frontend/src/PredictiveIntelligence.css
+frontend/src/services/analyticsService.js
+frontend/src/services/api.js
+frontend/src/services/authService.js
+frontend/src/services/disruptionService.js
+frontend/src/services/emergencyService.js
+frontend/src/services/languageService.js
+frontend/src/services/mlService.js
+frontend/src/services/reportService.js
+frontend/src/tests/App.test.jsx
+frontend/src/utils/accessibility/formatting.js
+frontend/src/utils/accessibility/keyboard.js
+frontend/src/utils/analyticsExport.js
+frontend/src/utils/analyticsJsonExport.js
+frontend/src/utils/performance/cache.js
+frontend/src/utils/performance/pagination.js
+frontend/src/utils/validation.js
+
+SECTION 2 — BACKEND SECURITY
+FOUND: backend/security/auth.py
+cp: illegal option -- -
+usage: cp [-R [-H | -L | -P]] [-fi | -n] [-aclpSsvXx] source_file target_file
+       cp [-R [-H | -L | -P]] [-fi | -n] [-aclpSsvXx] source_file ... target_directory
+FOUND: backend/security/roles.py
+cp: illegal option -- -
+usage: cp [-R [-H | -L | -P]] [-fi | -n] [-aclpSsvXx] source_file target_file
+       cp [-R [-H | -L | -P]] [-fi | -n] [-aclpSsvXx] source_file ... target_directory
+backend/security/auth.py:74:def get_current_user(
+backend/security/auth.py:99:@router.post("/register", status_code=201)
+backend/security/auth.py:130:@router.post("/login")
+backend/security/auth.py:159:@router.get("/me")
+backend/security/roles.py:56:def require_roles(*allowed_roles):
+
+SECTION 3 — DATABASE
+
+TABLE: disruptions
+COLUMNS: ['id', 'title', 'disruption_type', 'location', 'latitude', 'longitude', 'duration_hours', 'affected_population', 'severity', 'created_at', 'status']
+
+TABLE: emergency_incidents
+COLUMNS: ['id', 'title', 'description', 'location', 'incident_type', 'priority', 'status', 'assigned_team', 'reported_by', 'created_at', 'updated_at']
+
+TABLE: sqlite_sequence
+COLUMNS: ['name', 'seq']
+
+TABLE: users
+COLUMNS: ['id', 'name', 'email', 'password_hash', 'role', 'created_at']
+
+SECTION 4 — BACKEND MODULES
+FOUND: analytics
+backend/analytics/service.py
+backend/analytics/city_metrics.py
+backend/analytics/__init__.py
+backend/analytics/__pycache__/service.cpython-314.pyc
+backend/analytics/__pycache__/routes.cpython-314.pyc
+backend/analytics/__pycache__/city_metrics.cpython-314.pyc
+backend/analytics/__pycache__/__init__.cpython-314.pyc
+backend/analytics/__pycache__/prediction_metrics.cpython-314.pyc
+backend/analytics/prediction_metrics.py
+backend/analytics/routes.py
+FOUND: intelligence
+backend/intelligence/predictions.py
+backend/intelligence/__init__.py
+backend/intelligence/__pycache__/__init__.cpython-314.pyc
+backend/intelligence/__pycache__/predictions.cpython-314.pyc
+FOUND: ml
+backend/ml/__init__.py
+backend/ml/__pycache__/train.cpython-314.pyc
+backend/ml/__pycache__/__init__.cpython-314.pyc
+backend/ml/train.py
+FOUND: emergency
+backend/emergency/__init__.py
+backend/emergency/response.py
+backend/emergency/__pycache__/response.cpython-314.pyc
+backend/emergency/__pycache__/routes.cpython-314.pyc
+backend/emergency/__pycache__/__init__.cpython-314.pyc
+backend/emergency/routes.py
+FOUND: executive
+backend/executive/metrics.py
+backend/executive/__init__.py
+backend/executive/__pycache__/__init__.cpython-314.pyc
+backend/executive/__pycache__/metrics.cpython-314.pyc
+FOUND: security
+backend/security/auth.py
+backend/security/roles.py
+backend/security/__init__.py
+backend/security/__pycache__/roles.cpython-314.pyc
+backend/security/__pycache__/auth.cpython-314.pyc
+backend/security/__pycache__/__init__.cpython-314.pyc
+backend/security/permissions/__init__.py
+backend/security/permissions/__pycache__/dependencies.cpython-314.pyc
+backend/security/permissions/__pycache__/__init__.cpython-314.pyc
+backend/security/permissions/dependencies.py
+
+SECTION 5 — API ROUTER REGISTRATION
+1:from analytics.routes import router as analytics_router
+2:from disruption_management.routes import router as management_router
+3:from intelligence.predictions import router as intelligence_router
+4:from security.auth import router as auth_router
+12:from emergency.routes import router as emergency_router
+20:app.include_router(emergency_router)
+21:app.include_router(intelligence_router)
+23:app.include_router(auth_router)
+24:app.include_router(management_router)
+240:app.include_router(analytics_router)
+
+SECTION 6 — BACKEND SYNTAX
+Python virtual environment missing.
+
+SECTION 7 — BACKEND IMPORT TEST
+
+SECTION 8 — AUTHENTICATION FRONTEND
+/Users/apple/Desktop/urban-ripple/frontend/src/auth/AuthScreen.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/auth/AuthContext.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/auth/AuthGate.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/auth/Auth.css
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/auth/ForgotPassword.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/auth/AuthScreen.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/auth/Login.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/auth/Register.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/services/authService.js
+
+SECTION 9 — DASHBOARD MODULES
+/Users/apple/Desktop/urban-ripple/frontend/src/App_before_analytics.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/utils/analyticsExport.js
+/Users/apple/Desktop/urban-ripple/frontend/src/utils/analyticsJsonExport.js
+/Users/apple/Desktop/urban-ripple/frontend/src/App_before_impact_ui.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/PredictiveIntelligence.css
+/Users/apple/Desktop/urban-ripple/frontend/src/App_before_live_map.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/analyst/PredictionEvaluation.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/analyst/ImpactWorkspace.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/analyst/AnalystDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/Analytics.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/admin/AdminDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/emergency/EmergencyResponse.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/emergency/EmergencyDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/emergency/ResponseTeams.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/emergency/EmergencyDashboard.css
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/dependencies/DependencyMap.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/PredictiveIntelligence.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/official/EmergencyAssignments.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/official/OfficialDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/public/PublicDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/resilience/ResilienceDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/ml/MLDashboard.css
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/ml/MLDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/PredictiveInsights.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/maintenance/PredictiveMaintenance.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/heatmap/RiskHeatmap.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/performance/PerformanceDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/analytics/charts/AnalyticsCharts.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/analytics/charts/AnalyticsCharts.css
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/analytics/AnalyticsDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/analytics/AnalyticsDashboard.css
+/Users/apple/Desktop/urban-ripple/frontend/src/modules/executive/ExecutiveDashboard.jsx
+/Users/apple/Desktop/urban-ripple/frontend/src/services/emergencyService.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/analyticsService.js
+
+SECTION 10 — API SERVICES
+/Users/apple/Desktop/urban-ripple/frontend/src/services/disruptionService.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/mlService.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/languageService.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/emergencyService.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/authService.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/api.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/reportService.js
+/Users/apple/Desktop/urban-ripple/frontend/src/services/analyticsService.js
+
+SECTION 11 — FRONTEND ROUTING
+----- /Users/apple/Desktop/urban-ripple/frontend/src/App.jsx -----
+17:import Analytics from "./modules/Analytics";
+216:    { label: "Analytics", icon: BarChart3 },
+493:           {page === "Analytics" && <Analytics events={events} />}
+----- /Users/apple/Desktop/urban-ripple/frontend/src/AppRouter.jsx -----
+8:export default function AppRouter() {
+
+SECTION 12 — DEPENDENCIES
+frontend@0.0.0 /Users/apple/Desktop/urban-ripple/frontend
+├── @types/react-dom@19.3.0
+├── @types/react@19.3.0
+├── @vitejs/plugin-react@6.1.2
+├── axios@1.21.0
+├── i18next@26.6.0
+├── jspdf@4.2.1
+├── leaflet@1.9.4
+├── lucide-react@1.64.0
+├── oxlint@1.90.0
+├── react-dom@19.3.1
+├── react-i18next@17.1.9
+├── react-leaflet@5.0.0
+├── react@19.3.1
+├── recharts@3.10.1
+├── vite-plugin-pwa@2.0.0
+├── vite@8.3.5
+└── xlsx@0.18.5
+
+
+SECTION 13 — FRONTEND BUILD
+
+> frontend@0.0.0 build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 2869 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          0.45 kB │ gzip:   0.29 kB
+dist/assets/index-C5WF3ZBA.css          33.20 kB │ gzip:  10.84 kB
+dist/assets/purify.es-Dqk5qvad.js       29.02 kB │ gzip:  11.45 kB
+dist/assets/index.es-Bpv0VaA1.js       151.37 kB │ gzip:  48.88 kB
+dist/assets/html2canvas-C63oUYN6.js    199.39 kB │ gzip:  46.73 kB
+dist/assets/index-C8VlKsJt.js        1,505.32 kB │ gzip: 464.54 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 503ms
+Frontend build exit code: 0
+
+SECTION 14 — ENVIRONMENT FILE CHECK
+CONFIGURATION FILE EXISTS: /Users/apple/Desktop/urban-ripple/backend/.env
+JWT_SECRET is configured
+JWT_ALGORITHM is configured
+NOT FOUND: /Users/apple/Desktop/urban-ripple/frontend/.env
+
+SECTION 15 — DEPLOYMENT FILES
+/Users/apple/Desktop/urban-ripple/frontend/Dockerfile
+/Users/apple/Desktop/urban-ripple/Dockerfile
+/Users/apple/Desktop/urban-ripple/backend/requirements.txt
+/Users/apple/Desktop/urban-ripple/backend/Dockerfile
+/Users/apple/Desktop/urban-ripple/docker-compose.yml
+
+================================================
+AUDIT COMPLETE
+================================================
+Report: /Users/apple/Desktop/urban-ripple/urban_ripple_audit.txt
+Backup: /Users/apple/Desktop/urban-ripple/backups/full_audit_20261101_112233
+No existing application source files were overwritten.

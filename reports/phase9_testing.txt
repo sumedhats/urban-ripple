@@ -1,0 +1,124 @@
+
+641–650: Environment
+/Users/apple/Desktop/urban-ripple
+v22.23.1
+10.9.8
+Python 3.14.3
+No broken requirements found.
+
+651–660: Backend compilation
+Compilation exit code: 0
+
+661–670: Database integrity
+Integrity: ok
+
+Table: disruptions
+Columns: ['id', 'title', 'disruption_type', 'location', 'latitude', 'longitude', 'duration_hours', 'affected_population', 'severity', 'created_at', 'status']
+Records: 3
+
+Table: emergency_incidents
+Columns: ['id', 'title', 'description', 'location', 'incident_type', 'priority', 'status', 'assigned_team', 'reported_by', 'created_at', 'updated_at']
+Records: 0
+
+Table: sqlite_sequence
+Columns: ['name', 'seq']
+Records: 1
+
+Table: users
+Columns: ['id', 'name', 'email', 'password_hash', 'role', 'created_at']
+Records: 1
+
+671–680: API registration
+GET,HEAD /openapi.json
+GET,HEAD /docs
+GET,HEAD /docs/oauth2-redirect
+GET,HEAD /redoc
+GET /
+GET /health
+GET /api/disruptions
+POST /api/disruptions
+GET /api/disruptions/{disruption_id}
+POST /api/impact/analyze
+
+681–690: Backend automated tests
+/Users/apple/Desktop/urban-ripple/backend/venv/bin/python: No module named pytest
+Test exit code: 1
+
+691–700: Authentication implementation
+6:import jwt
+24:password_hash = PasswordHash.recommended()
+42:                password_hash TEXT NOT NULL,
+71:    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+74:def get_current_user(
+78:        payload = jwt.decode(
+84:    except (jwt.InvalidTokenError, KeyError, ValueError):
+99:@router.post("/register", status_code=201)
+100:def register(data: RegisterRequest):
+102:    hashed = password_hash.hash(data.password)
+107:                INSERT INTO users (name, email, password_hash, role, created_at)
+117:        raise HTTPException(status_code=409, detail="Email already registered")
+130:@router.post("/login")
+131:def login(data: LoginRequest):
+140:    if user is None or not password_hash.verify(
+141:        data.password, user["password_hash"]
+160:def my_profile(user: dict = Depends(get_current_user)):
+
+701–710: Role permissions
+4:ROLE_PERMISSIONS = {
+5:    "admin": {
+10:        "disruptions:read_public",
+23:    "official": {
+35:    "analyst": {
+49:    "public": {
+51:        "disruptions:read_public",
+56:def require_roles(*allowed_roles):
+58:        role = str(user.get("role", "public")).lower()
+73:        role = str(user.get("role", "public")).lower()
+75:        if permission not in ROLE_PERMISSIONS.get(role, set()):
+
+711–720: Frontend module verification
+FOUND: src/App.jsx
+FOUND: src/AppRouter.jsx
+FOUND: src/modules/analytics/AnalyticsDashboard.jsx
+FOUND: src/modules/ml/MLDashboard.jsx
+FOUND: src/modules/emergency/EmergencyDashboard.jsx
+FOUND: src/modules/command/CommandCentre.jsx
+FOUND: src/modules/auth/Login.jsx
+FOUND: src/modules/auth/Register.jsx
+
+721–730: Frontend automated tests
+No test script configured in package.json.
+
+731–740: Production build
+
+> frontend@0.0.0 build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 2869 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          0.45 kB │ gzip:   0.29 kB
+dist/assets/index-C5WF3ZBA.css          33.20 kB │ gzip:  10.84 kB
+dist/assets/purify.es-Dqk5qvad.js       29.02 kB │ gzip:  11.45 kB
+dist/assets/index.es-Bpv0VaA1.js       151.37 kB │ gzip:  48.88 kB
+dist/assets/html2canvas-C63oUYN6.js    199.39 kB │ gzip:  46.73 kB
+dist/assets/index-C8VlKsJt.js        1,505.32 kB │ gzip: 464.54 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 425ms
+
+Frontend build exit code: 0
+Production output:
+-rw-r--r--  1 apple  staff   458B  1 Nov 11:24 dist/index.html
+
+==========================================
+PHASE 9 COMPLETE
+==========================================
+Report saved at: reports/phase9_testing.txt
+No application source files were overwritten.

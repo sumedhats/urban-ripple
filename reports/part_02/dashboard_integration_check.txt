@@ -1,0 +1,403 @@
+========== APP ROUTER ==========
+import { useEffect, useState } from "react";
+import App from "./App.jsx";
+import AuthScreen from "./auth/AuthScreen.jsx";
+import RolePortal from "./portals/RolePortal.jsx";
+
+import { API_BASE_URL as API } from "./services/api.js";
+
+export default function AppRouter() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifySession() {
+      const token = localStorage.getItem("urban_ripple_token");
+
+      if (!token) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Session expired");
+
+        const data = await response.json();
+        if (active) setUser(data.user);
+      } catch {
+        localStorage.removeItem("urban_ripple_token");
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    verifySession();
+    return () => { active = false; };
+  }, []);
+
+  function logout() {
+    localStorage.removeItem("urban_ripple_token");
+    setUser(null);
+    setWorkspace(false);
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40, fontFamily: "Arial" }}>Verifying session...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={setUser} />;
+  }
+
+  if (!workspace) {
+    return (
+      <RolePortal
+        user={user}
+        onOpenWorkspace={() => setWorkspace(true)}
+        onLogout={logout}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        padding: "10px 20px",
+        background: "#f1f1fa",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <span>Signed in: {user.name} ({user.role})</span>
+        <button onClick={() => setWorkspace(false)}>Portal</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+      <App />
+    </div>
+  );
+}
+========== ROLE PERMISSIONS ==========
+from fastapi import Depends, HTTPException, status
+from security.auth import get_current_user
+
+ROLE_PERMISSIONS = {
+    "admin": {
+        "users:manage",
+        "departments:manage",
+        "disruptions:submit",
+        "disruptions:read",
+        "disruptions:read_public",
+        "disruptions:review",
+        "disruptions:assign",
+        "analytics:read",
+        "reports:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+        "audit:read",
+        "settings:manage",
+    },
+
+    "official": {
+        "disruptions:read",
+        "disruptions:review",
+        "disruptions:assign",
+        "analytics:read",
+        "reports:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+    },
+
+    "analyst": {
+        "disruptions:read",
+        "analytics:read",
+        "reports:read",
+    },
+
+    "emergency": {
+        "disruptions:read",
+        "emergency:read",
+        "emergency:manage",
+        "resources:read",
+        "resources:manage",
+    },
+
+    "public": {
+        "disruptions:submit",
+        "disruptions:read_public",
+    },
+}
+
+
+def require_roles(*allowed_roles):
+    def dependency(user=Depends(get_current_user)):
+        role = str(user.get("role", "public")).lower()
+
+        if role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your role is not permitted to perform this action."
+            )
+
+        return user
+
+    return dependency
+
+
+def require_permission(permission):
+    def dependency(user=Depends(get_current_user)):
+        role = str(user.get("role", "public")).lower()
+
+        if permission not in ROLE_PERMISSIONS.get(role, set()):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: {permission}"
+            )
+
+        return user
+
+    return dependency
+========== BACKEND DISRUPTION ENDPOINTS ==========
+98-    }
+99-
+100-
+101-@app.get("/health")
+102-def health():
+103-    return {"status": "healthy"}
+104-
+105-
+106:@app.get("/api/disruptions")
+107-def get_disruptions():
+108-    with get_db() as conn:
+109-        rows = conn.execute(
+110-            "SELECT * FROM disruptions ORDER BY created_at DESC"
+111-        ).fetchall()
+112-    records = [row_to_dict(row) for row in rows]
+113-    return {"count": len(records), "disruptions": records}
+114-
+115:@app.post("/api/disruptions", status_code=201)
+116-def create_disruption(data: DisruptionCreate):
+117-    record = data.model_dump()
+118-    record["id"] = str(uuid4())
+119-    record["created_at"] = datetime.now(timezone.utc).isoformat()
+120-    record["status"] = "Active"
+121-
+122-    with get_db() as conn:
+123-        conn.execute("""
+124-            INSERT INTO disruptions (
+125-                id, title, disruption_type, location, latitude,
+126-                longitude, duration_hours, affected_population,
+127-                severity, created_at, status
+128-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+129-        """, (
+130-            record["id"], record["title"], record["disruption_type"],
+131-            record["location"], record["latitude"], record["longitude"],
+132-            record["duration_hours"], record["affected_population"],
+133-            record["severity"], record["created_at"], record["status"]
+134-        ))
+135-
+136-    return {
+137-        "message": "Disruption registered successfully",
+138-        "disruption": record
+139-    }
+140-
+141:@app.get("/api/disruptions/{disruption_id}")
+142-def get_disruption(disruption_id: str):
+143-    with get_db() as conn:
+144-        row = conn.execute(
+145-            "SELECT * FROM disruptions WHERE id = ?",
+146-            (disruption_id,)
+147-        ).fetchone()
+148-
+149-    record = row_to_dict(row)
+150-    if record is None:
+151-        raise HTTPException(status_code=404, detail="Disruption not found")
+152-    return record
+153-
+154-@app.post("/api/impact/analyze")
+155-def analyze_impact(data: ImpactRequest):
+156-    # Transparent demonstration formula, not a trained prediction model.
+157-    severity_weights = {
+158-        "Low": 1,
+159-        "Medium": 2,
+160-        "High": 3,
+161-        "Critical": 4
+162-    }
+163-
+164-    type_weights = {
+165-        "Road Closure": 1.0,
+166-        "Water Outage": 1.3,
+167-        "Power Outage": 1.5
+168-    }
+169-
+170-    raw_score = (
+171-        data.affected_population
+172-        * min(data.duration_hours, 72)
+173-        * severity_weights[data.severity]
+174-        * type_weights[data.disruption_type]
+175-    )
+176-
+177-    impact_score = round(
+178-        min(100, raw_score / 10000 * 100), 1
+179-    )
+180-
+181-    if impact_score < 25:
+182-        impact_level = "Low"
+183-    elif impact_score < 50:
+184-        impact_level = "Moderate"
+185-    elif impact_score < 75:
+186-        impact_level = "High"
+========== ANALYTICS CHARTS ==========
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line
+} from "recharts";
+
+import "./AnalyticsCharts.css";
+
+const COLORS = [
+  "#2878d0",
+  "#16a085",
+  "#e6a23c",
+  "#e05252",
+  "#805ad5",
+  "#64748b"
+];
+
+export default function AnalyticsCharts({ data }) {
+  if (!data) return null;
+
+  const severityData = data.severity_distribution || [];
+  const typeData = data.disruption_types || [];
+  const monthlyData = data.monthly_trend || [];
+
+  const locationData = [...(data.location_impact || [])]
+    .sort(
+      (a, b) =>
+        Number(b.affected_population || 0) -
+        Number(a.affected_population || 0)
+    )
+    .slice(0, 10);
+
+  return (
+    <section className="urban-charts">
+      <article className="urban-chart-card">
+        <h2>Monthly Disruption Activity</h2>
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={monthlyData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Line
+              type="monotone"
+              dataKey="count"
+              name="Disruptions"
+              stroke="#2878d0"
+              strokeWidth={3}
+              activeDot={{ r: 7 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </article>
+
+      <article className="urban-chart-card">
+        <h2>Severity Distribution</h2>
+        <ResponsiveContainer width="100%" height={280}>
+          <PieChart>
+            <Pie
+              data={severityData}
+              dataKey="count"
+              nameKey="severity"
+              cx="50%"
+              cy="50%"
+              outerRadius={90}
+              label
+            >
+              {severityData.map((item, index) => (
+                <Cell
+                  key={`${item.severity}-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </article>
+
+      <article className="urban-chart-card">
+        <h2>Disruption Categories</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={typeData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" allowDecimals={false} />
+            <YAxis
+              type="category"
+              dataKey="disruption_type"
+              width={120}
+            />
+            <Tooltip />
+            <Bar
+              dataKey="count"
+              name="Disruptions"
+              fill="#16a085"
+              radius={[0, 6, 6, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </article>
+
+      <article className="urban-chart-card">
+        <h2>Population Affected by Location</h2>
+        {locationData.length === 0 ? (
+          <p>No location impact data available.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={locationData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis
+                type="category"
+                dataKey="location"
+                width={120}
+              />
+              <Tooltip />
+              <Bar
+                dataKey="affected_population"
+                name="Affected Population"
+                fill="#805ad5"
+                radius={[0, 6, 6, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </article>
+    </section>
+  );
+}
+========== DATABASE STATUS COUNTS ==========
+('Active', 3)

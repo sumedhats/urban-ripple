@@ -1,0 +1,224 @@
+/Users/apple/Desktop/urban-ripple/backend/venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+URBAN RIPPLE FINAL AUDIT
+=================================================================
+PASS | 1. Foundation: backend
+PASS | 2. Foundation: frontend
+PASS | 3. Foundation: backend/main.py
+PASS | 4. Foundation: backend/urban_ripple.db
+PASS | 5. Foundation: backend/.env
+PASS | 6. Foundation: backend/requirements.txt
+PASS | 7. Foundation: frontend/package.json
+PASS | 8. Foundation: frontend/src/App.jsx
+PASS | 9. Foundation: frontend/src/main.jsx
+PASS | 10. Foundation: docker-compose.yml
+PASS | 11. Backend: main.py | 7160 bytes
+PASS | 12. Backend: security/auth.py | 4362 bytes
+PASS | 13. Backend: security/roles.py | 2000 bytes
+PASS | 14. Backend: analytics/routes.py | 790 bytes
+PASS | 15. Backend: analytics/service.py | 3336 bytes
+PASS | 16. Backend: intelligence/predictions.py | 7631 bytes
+PASS | 17. Backend: emergency/routes.py | 6298 bytes
+CHECK | 18. Backend: ml/train.py | 0 bytes
+CHECK | 19. Backend: tests/test_disruptions.py | 0 bytes
+CHECK | 20. Backend: tests/test_impact.py | 0 bytes
+PASS | 21. Frontend: App.jsx | 25421 bytes
+PASS | 22. Frontend: AppRouter.jsx | 2092 bytes
+PASS | 23. Frontend: modules/Analytics.jsx | 2672 bytes
+PASS | 24. Frontend: modules/analytics/AnalyticsDashboard.jsx | 9860 bytes
+PASS | 25. Frontend: modules/analytics/charts/AnalyticsCharts.jsx | 3725 bytes
+PASS | 26. Frontend: modules/ml/MLDashboard.jsx | 5481 bytes
+PASS | 27. Frontend: modules/emergency/EmergencyDashboard.jsx | 8187 bytes
+PASS | 28. Frontend: modules/command/CommandCentre.jsx | 2827 bytes
+PASS | 29. Frontend: modules/auth/Login.jsx | 1813 bytes
+PASS | 30. Frontend: modules/auth/Register.jsx | 2073 bytes
+CHECK | 31. Frontend service: services/api.js
+PASS | 32. Frontend service: services/authService.js
+CHECK | 33. Frontend service: services/disruptionService.js
+PASS | 34. Frontend service: services/analyticsService.js
+PASS | 35. Frontend service: services/mlService.js
+PASS | 36. Frontend service: services/emergencyService.js
+CHECK | 37. Frontend service: services/reportService.js
+PASS | 38. Frontend service: utils/analyticsExport.js
+PASS | 39. Frontend service: utils/analyticsJsonExport.js
+CHECK | 40. Frontend service: tests/App.test.jsx
+CHECK | 41. Backend module: admin
+CHECK | 42. Backend module: alerts
+PASS | 43. Backend module: analytics
+CHECK | 44. Backend module: audit
+CHECK | 45. Backend module: citizen
+CHECK | 46. Backend module: departments
+PASS | 47. Backend module: emergency
+CHECK | 48. Backend module: executive
+PASS | 49. Backend module: intelligence
+PASS | 50. Backend module: security
+CHECK | 51. Frontend module: admin
+CHECK | 52. Frontend module: analyst
+CHECK | 53. Frontend module: alerts
+CHECK | 54. Frontend module: citizen
+PASS | 55. Frontend module: command
+CHECK | 56. Frontend module: dependencies
+PASS | 57. Frontend module: emergency
+CHECK | 58. Frontend module: executive
+CHECK | 59. Frontend module: official
+CHECK | 60. Frontend module: public
+PASS | 61. Deployment: Dockerfile
+PASS | 62. Deployment: docker-compose.yml
+PASS | 63. Deployment: backend/Dockerfile
+PASS | 64. Deployment: frontend/Dockerfile
+PASS | 65. Deployment: frontend/vite.config.js
+PASS | 66. Deployment: frontend/index.html
+PASS | 67. Deployment: frontend/package-lock.json
+PASS | 68. Deployment: backend/venv/bin/python
+PASS | 69. Deployment: backend/.env.example
+PASS | 70. Deployment: docs/deployment/DEPLOYMENT.md
+PASS | 71. Database opens
+PASS | 72. Database table: disruptions
+PASS | 73. Database table: users
+PASS | 74. Database table: emergency_incidents
+PASS | 75. Database table: sqlite_sequence
+PASS | 76. Database has records or is empty safely
+PASS | 77. Database integrity
+PASS | 78. Disruption schema
+PASS | 79. User schema
+PASS | 80. Database connection closed safely
+PASS | 81. Backend Python compilation
+PASS | 82. Main application imports
+PASS | 83. Health endpoint | 200
+PASS | 84. OpenAPI endpoint
+PASS | 85. Disruptions endpoint
+PASS | 86. API route registry | 19 routes
+PASS | 87. Authentication registration route
+PASS | 88. Authentication login route
+PASS | 89. Analytics route registered
+PASS | 90. Emergency route registered
+PASS | 91. Authentication implementation exists
+PASS | 92. Role permissions implementation exists
+PASS | 93. JWT secret configuration exists
+PASS | 94. JWT secret is not blank
+PASS | 95. Frontend package scripts exist
+PASS | 96. Frontend dependencies installed
+
+Running production frontend build...
+PASS | 97. Frontend production build | html2canvas-C63oUYN6.js    199.39 kB │ gzip:  46.73 kB
+dist/assets/index-C8VlKsJt.js        1,505.32 kB │ gzip: 464.54 kB
+
+✓ built in 517ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+PASS | 98. Production dist directory
+CHECK | 99. No empty source placeholders | 340 empty files
+PASS | 100. Final audit report generated
+
+=================================================================
+TOTAL: 100 CHECKS
+PASS: 78
+CHECK / FAIL: 22
+
+Empty source files:
+ - backend/settings/__init__.py
+ - backend/settings/routes.py
+ - backend/database/backup.py
+ - backend/database/__init__.py
+ - backend/database/restore.py
+ - backend/collaboration/__init__.py
+ - backend/collaboration/routes.py
+ - backend/knowledge_graph/__init__.py
+ - backend/knowledge_graph/schema.py
+ - backend/tasks/__init__.py
+ - backend/tasks/routes.py
+ - backend/decision_support/__init__.py
+ - backend/decision_support/engine.py
+ - backend/decision_support/routes.py
+ - backend/intelligence/__init__.py
+ - backend/security/__init__.py
+ - backend/auth/security.py
+ - backend/auth/__init__.py
+ - backend/public_api/alerts.py
+ - backend/public_api/__init__.py
+ - backend/public_api/reports.py
+ - backend/public_api/routes.py
+ - backend/health/checks.py
+ - backend/health/__init__.py
+ - backend/resources/__init__.py
+ - backend/resources/routes.py
+ - backend/tests/test_disruptions.py
+ - backend/tests/__init__.py
+ - backend/tests/test_impact.py
+ - backend/admin/users.py
+ - backend/admin/__init__.py
+ - backend/admin/departments.py
+ - backend/workflows/__init__.py
+ - backend/workflows/routes.py
+ - backend/emergency/__init__.py
+ - backend/emergency/response.py
+ - backend/simulation/__init__.py
+ - backend/simulation/engine.py
+ - backend/dependencies/graph.py
+ - backend/dependencies/__init__.py
+ - backend/departments/__init__.py
+ - backend/departments/routes.py
+ - backend/citizen/__init__.py
+ - backend/citizen/routes.py
+ - backend/water_risk/__init__.py
+ - backend/water_risk/model.py
+ - backend/alerts/__init__.py
+ - backend/alerts/routes.py
+ - backend/integrations/infrastructure.py
+ - backend/integrations/weather.py
+ - backend/integrations/__init__.py
+ - backend/integrations/traffic.py
+ - backend/digital_twin/__init__.py
+ - backend/digital_twin/engine.py
+ - backend/historical/analysis.py
+ - backend/historical/__init__.py
+ - backend/official/incident_management.py
+ - backend/official/__init__.py
+ - backend/city_comparison/analysis.py
+ - backend/city_comparison/__init__.py
+ - backend/ai_assistant/__init__.py
+ - backend/ai_assistant/summarizer.py
+ - backend/audit/__init__.py
+ - backend/audit/logger.py
+ - backend/mobility/analysis.py
+ - backend/mobility/__init__.py
+ - backend/resilience/scoring.py
+ - backend/resilience/__init__.py
+ - backend/ml/__init__.py
+ - backend/ml/train.py
+ - backend/users/__init__.py
+ - backend/users/routes.py
+ - backend/scenarios/__init__.py
+ - backend/scenarios/simulator.py
+ - backend/scenarios/routes.py
+ - backend/environment/analysis.py
+ - backend/environment/__init__.py
+ - backend/maintenance/__init__.py
+ - backend/maintenance/engine.py
+ - backend/validators/disruption_validator.py
+ - backend/validators/__init__.py
+ - backend/heatmap/analysis.py
+ - backend/heatmap/__init__.py
+ - backend/vulnerability/assessment.py
+ - backend/vulnerability/__init__.py
+ - backend/monitoring/incident_monitor.py
+ - backend/monitoring/__init__.py
+ - backend/performance/metrics.py
+ - backend/performance/cache.py
+ - backend/performance/__init__.py
+ - backend/infrastructure/__init__.py
+ - backend/infrastructure/routes.py
+ - backend/disruption_management/__init__.py
+ - backend/timeline/__init__.py
+ - backend/timeline/routes.py
+ - backend/geospatial/analysis.py
+ - backend/geospatial/__init__.py
+ - backend/notifications/service.py
+ - backend/notifications/__init__.py
+ - backend/notifications/routes.py
+
+This is a verification report, not a claim of production readiness.

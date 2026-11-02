@@ -1,0 +1,1440 @@
+========== FRONTEND API CONFIGURATION ==========
+
+========== frontend/src/App.jsx ==========
+import { useState, useEffect } from "react";
+import {
+  Activity, AlertTriangle, BarChart3, Brain, Building2, Clock,
+  MapPin, Menu, Navigation, Plus, Radio, ShieldCheck,
+  TrendingUp, X
+} from "lucide-react";
+import {
+  Area, AreaChart, CartesianGrid, ResponsiveContainer,
+  Tooltip, XAxis, YAxis
+} from "recharts";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+import "./App.css";
+import PredictiveIntelligence from "./modules/PredictiveIntelligence.jsx";
+
+import Analytics from "./modules/Analytics";
+import PredictiveInsights from "./modules/PredictiveInsights";
+import RippleEffects from "./modules/RippleEffects";
+import LocationIntelligence from "./modules/LocationIntelligence";
+import RecommendationEngine from "./modules/RecommendationEngine";
+import Reports from "./modules/Reports";
+import SAPIntegration from "./modules/SAPIntegration";
+
+
+const initialEvents = [
+  { id: 1, name: "MG Road", area: "Central Business District", duration: "4 hours", severity: "High", status: "Active" },
+  { id: 2, name: "Brigade Road", area: "Commercial District", duration: "2 hours", severity: "Medium", status: "Monitoring" },
+  { id: 3, name: "Outer Ring Road", area: "Technology Corridor", duration: "6 hours", severity: "High", status: "Planned" }
+];
+
+const chartData = [
+  { time: "06 AM", impact: 12 }, { time: "08 AM", impact: 28 },
+  { time: "10 AM", impact: 46 }, { time: "12 PM", impact: 38 },
+  { time: "02 PM", impact: 61 }, { time: "04 PM", impact: 78 },
+  { time: "06 PM", impact: 92 }, { time: "08 PM", impact: 54 }
+];
+
+
+function MapAutoFit({ events }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const locations = events
+      .filter(event => event.latitude != null && event.longitude != null)
+      .map(event => [Number(event.latitude), Number(event.longitude)]);
+
+    if (locations.length === 1) {
+      map.setView(locations[0], 14);
+    } else if (locations.length > 1) {
+      map.fitBounds(locations, { padding: [40, 40], maxZoom: 14 });
+    }
+  }, [events, map]);
+
+  return null;
+}
+
+export default function App() {
+  const [events, setEvents] = useState([]);
+  const [page, setPage] = useState("Overview");
+  const [showForm, setShowForm] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedImpactId, setSelectedImpactId] = useState("");
+  const [impactResult, setImpactResult] = useState(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactError, setImpactError] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    area: "",
+    disruptionType: "Road Closure",
+    latitude: "",
+    longitude: "",
+    duration: "2 hours",
+    population: "0",
+    severity: "Medium"
+  });
+
+  const activeCount = events.filter(e => e.status === "Active").length;
+
+  useEffect(() => {
+    async function loadDisruptions() {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/disruptions");
+        if (!response.ok) throw new Error("Could not load disruptions");
+
+        const data = await response.json();
+
+        setEvents(data.disruptions.map(record => ({
+          id: record.id,
+          name: record.title,
+          area: record.location,
+          duration: `${record.duration_hours} hours`,
+          severity: record.severity,
+          status: record.status,
+          disruptionType: record.disruption_type,
+          latitude: record.latitude,
+          longitude: record.longitude,
+          affectedPopulation: record.affected_population
+        })));
+      } catch (error) {
+        console.error("Backend loading error:", error);
+      }
+    }
+
+    loadDisruptions();
+  }, []);
+
+  async function addEvent(e) {
+    e.preventDefault();
+
+    const payload = {
+      title: form.name,
+      disruption_type: form.disruptionType,
+      location: form.area,
+      latitude: form.latitude === "" ? null : Number(form.latitude),
+      longitude: form.longitude === "" ? null : Number(form.longitude),
+      duration_hours: parseFloat(form.duration),
+      affected_population: Number(form.population),
+      severity: form.severity
+    };
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/disruptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(JSON.stringify(result.detail || result));
+      }
+
+      const record = result.disruption;
+
+      setEvents(old => [{
+        id: record.id,
+        name: record.title,
+        area: record.location,
+        duration: `${record.duration_hours} hours`,
+        severity: record.severity,
+        status: record.status,
+        disruptionType: record.disruption_type,
+          latitude: record.latitude,
+          longitude: record.longitude,
+          affectedPopulation: record.affected_population
+      }, ...old]);
+
+      setForm({
+        name: "",
+        area: "",
+        disruptionType: "Road Closure",
+        latitude: "",
+        longitude: "",
+        duration: "2 hours",
+        population: "0",
+        severity: "Medium"
+      });
+      setShowForm(false);
+      setPage("Disruptions");
+
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("Could not save disruption. Check whether the backend is running. " + error.message);
+    }
+  }
+
+  async function runImpactAnalysis() {
+    const selected = events.find(
+      event => String(event.id) === String(selectedImpactId)
+    );
+
+    if (!selected) {
+      setImpactError("Please select a disruption first.");
+      return;
+    }
+
+    setImpactLoading(true);
+    setImpactError("");
+    setImpactResult(null);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/impact/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          disruption_type: selected.disruptionType,
+          duration_hours: parseFloat(selected.duration),
+          affected_population: Number(selected.affectedPopulation || 0),
+          severity: selected.severity
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(JSON.stringify(result.detail || result));
+      }
+
+      setImpactResult(result);
+    } catch (error) {
+      setImpactError("Analysis failed: " + error.message);
+    } finally {
+      setImpactLoading(false);
+    }
+  }
+
+  const nav = [
+    { label: "Overview", icon: BarChart3 },
+    { label: "Disruptions", icon: AlertTriangle },
+    { label: "City Map", icon: MapPin },
+    { label: "Impact Analysis", icon: TrendingUp },
+    { label: "Predictive Intelligence", icon: Brain },
+
+    { label: "Analytics", icon: BarChart3 },
+    { label: "Predictive Insights", icon: TrendingUp },
+    { label: "Ripple Effects", icon: Activity },
+    { label: "Location Intelligence", icon: MapPin },
+    { label: "Recommendations", icon: ShieldCheck },
+    { label: "Reports", icon: Building2 },
+    { label: "SAP Integration", icon: Radio }
+  ];
+
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
+        <div className="brand">
+          <div className="brand-icon"><Activity size={24} /></div>
+          <div><h2>URBAN RIPPLE</h2><span>URBAN INTELLIGENCE</span></div>
+          <button className="mobile-close" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+        </div>
+
+        <p className="workspace-label">WORKSPACE</p>
+        <nav>
+          {nav.map(({ label, icon: Icon }) => (
+            <button key={label}
+              className={`nav-item ${page === label ? "nav-active" : ""}`}
+              onClick={() => { setPage(label); setMenuOpen(false); }}>
+              <Icon size={19} /> <span>{label}</span>
+
+========== frontend/src/AppRouter.jsx ==========
+import { useEffect, useState } from "react";
+import App from "./App.jsx";
+import AuthScreen from "./auth/AuthScreen.jsx";
+import RolePortal from "./portals/RolePortal.jsx";
+
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+export default function AppRouter() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifySession() {
+      const token = localStorage.getItem("urban_ripple_token");
+
+      if (!token) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Session expired");
+
+        const data = await response.json();
+        if (active) setUser(data.user);
+      } catch {
+        localStorage.removeItem("urban_ripple_token");
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    verifySession();
+    return () => { active = false; };
+  }, []);
+
+  function logout() {
+    localStorage.removeItem("urban_ripple_token");
+    setUser(null);
+    setWorkspace(false);
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40, fontFamily: "Arial" }}>Verifying session...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={setUser} />;
+  }
+
+  if (!workspace) {
+    return (
+      <RolePortal
+        user={user}
+        onOpenWorkspace={() => setWorkspace(true)}
+        onLogout={logout}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        padding: "10px 20px",
+        background: "#f1f1fa",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <span>Signed in: {user.name} ({user.role})</span>
+        <button onClick={() => setWorkspace(false)}>Portal</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+      <App />
+    </div>
+  );
+}
+
+========== frontend/src/auth/AuthScreen.jsx ==========
+import { useState } from "react";
+
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+export default function AuthScreen({ onLogin }) {
+  const [mode, setMode] = useState("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (mode === "register") {
+        const registration = await fetch(`${API}/api/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password })
+        });
+
+        const result = await registration.json();
+
+        if (!registration.ok) {
+          throw new Error(result.detail || "Registration failed");
+        }
+      }
+
+      const response = await fetch(`${API}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Login failed");
+      }
+
+      localStorage.setItem("urban_ripple_token", data.access_token);
+      onLogin(data.user);
+    } catch (err) {
+      setError(err.message || "Unable to connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main style={styles.page}>
+      <section style={styles.card}>
+        <div style={styles.logo}>UR</div>
+        <h1>URBAN RIPPLE</h1>
+        <p style={styles.subtitle}>City Disruption Intelligence Platform</p>
+
+        <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+
+        <form onSubmit={submit}>
+          {mode === "register" && (
+            <label style={styles.label}>
+              Full name
+              <input
+                style={styles.input}
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+                minLength={2}
+              />
+            </label>
+          )}
+
+          <label style={styles.label}>
+            Email address
+            <input
+              style={styles.input}
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </label>
+
+          <label style={styles.label}>
+            Password
+            <input
+              style={styles.input}
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </label>
+
+          {error && <p style={styles.error}>{error}</p>}
+
+          <button style={styles.button} disabled={loading}>
+            {loading ? "Please wait..." :
+              mode === "login" ? "Sign in" : "Create account"}
+          </button>
+        </form>
+
+        <p style={styles.switch}>
+          {mode === "login" ? "New to URBAN RIPPLE?" : "Already registered?"}
+          {" "}
+          <button
+            style={styles.link}
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError("");
+            }}
+          >
+            {mode === "login" ? "Create account" : "Sign in"}
+          </button>
+        </p>
+
+        <small style={styles.note}>
+          New accounts receive the public role by default.
+        </small>
+      </section>
+    </main>
+  );
+}
+
+const styles = {
+  page: {
+    minHeight: "100vh", display: "grid", placeItems: "center",
+    background: "#f2f4fa", padding: 20, fontFamily: "Arial, sans-serif"
+  },
+  card: {
+    width: "100%", maxWidth: 420, background: "white",
+    padding: 36, borderRadius: 18, boxSizing: "border-box",
+    boxShadow: "0 12px 45px rgba(25,35,70,.09)"
+  },
+  logo: {
+    width: 52, height: 52, display: "grid", placeItems: "center",
+    background: "#5957cb", color: "white", borderRadius: 14,
+    fontWeight: 800, fontSize: 20
+  },
+  subtitle: { color: "#777", marginBottom: 30 },
+  label: {
+    display: "block", fontWeight: 600, fontSize: 13,
+    marginBottom: 16, color: "#34364a"
+  },
+  input: {
+    display: "block", width: "100%", boxSizing: "border-box",
+    padding: 13, marginTop: 8, border: "1px solid #dfe1eb",
+    borderRadius: 9, fontSize: 15
+  },
+  button: {
+    width: "100%", padding: 14, border: 0, borderRadius: 9,
+    background: "#5957cb", color: "white", fontWeight: 700,
+    cursor: "pointer", marginTop: 10
+  },
+  error: { color: "#c0394a", fontSize: 13 },
+  switch: { textAlign: "center", fontSize: 13, marginTop: 22 },
+  link: {
+    color: "#5957cb", background: "none", border: 0,
+    fontWeight: 700, cursor: "pointer"
+  },
+  note: { display: "block", color: "#888", textAlign: "center", marginTop: 18 }
+};
+
+========== frontend/src/services/api.js ==========
+
+========== frontend/src/services/authService.js ==========
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+export async function registerUser(data) {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Registration failed");
+  return result;
+}
+
+export async function loginUser(data) {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Login failed");
+  return result;
+}
+
+export async function getMyProfile(token) {
+  const response = await fetch(`${API_URL}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || "Session expired");
+  return result.user;
+}
+
+========== frontend/src/services/analyticsService.js ==========
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+export async function getAnalyticsOverview(startDate = "", endDate = "") {
+  const token = localStorage.getItem("urban_ripple_token");
+
+  const params = new URLSearchParams();
+
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+
+  const query = params.toString();
+  const url = `${API_URL}/api/analytics/overview${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.detail || `Analytics request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+========== frontend/src/services/disruptionService.js ==========
+
+========== frontend/src/services/emergencyService.js ==========
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+async function request(endpoint, options = {}) {
+  const token = localStorage.getItem("urban_ripple_token");
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.detail || `API error: ${response.status}`);
+  }
+
+  return data;
+}
+
+export const getEmergencyIncidents = () =>
+  request("/api/emergency/incidents");
+
+export const getEmergencySummary = () =>
+  request("/api/emergency/summary");
+
+export const createEmergencyIncident = (incident) =>
+  request("/api/emergency/incidents", {
+    method: "POST",
+    body: JSON.stringify(incident),
+  });
+
+export const updateEmergencyIncident = (id, changes) =>
+  request(`/api/emergency/incidents/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+
+========== frontend/src/services/mlService.js ==========
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+function getHeaders() {
+  const token = localStorage.getItem("urban_ripple_token");
+
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function request(endpoint, options = {}) {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      ...getHeaders(),
+      ...options.headers,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail || `Request failed: ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+export const getMLStatus = () =>
+  request("/api/ml/status");
+
+export const trainMLModel = () =>
+  request("/api/ml/train", {
+    method: "POST",
+  });
+
+export const getMLAnomalies = () =>
+  request("/api/ml/anomalies");
+
+========== frontend/src/modules/PredictiveIntelligence.jsx ==========
+
+import "../PredictiveIntelligence.css";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Activity, AlertTriangle, Brain, RefreshCw, ShieldAlert,
+  TrendingUp, MapPin, Clock, Lightbulb
+} from "lucide-react";
+
+const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+async function load(endpoint) {
+  const response = await fetch(`${API}${endpoint}`);
+  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+  return response.json();
+}
+
+function scoreColor(score) {
+  if (score >= 75) return "#dc2626";
+  if (score >= 50) return "#ea580c";
+  if (score >= 25) return "#ca8a04";
+  return "#16a34a";
+}
+
+function Metric({ title, value, caption, icon: Icon }) {
+  return <article className="pi-metric">
+    <div className="pi-metric-heading"><span>{title}</span><Icon size={19}/></div>
+    <strong>{value}</strong>
+    <small>{caption}</small>
+  </article>;
+}
+
+export default function PredictiveIntelligence() {
+  const [data, setData] = useState({
+    risks: null, forecast: null, anomalies: null,
+    recommendations: null, hazards: null
+  });
+  const [horizon, setHorizon] = useState(24);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [risks, forecast, anomalies, recommendations, hazards] =
+        await Promise.all([
+          load("/api/intelligence/risk-scores"),
+          load(`/api/intelligence/forecast?horizon_hours=${horizon}`),
+          load("/api/intelligence/anomalies"),
+          load("/api/intelligence/recommendations"),
+          load("/api/intelligence/multi-hazard")
+        ]);
+      setData({ risks, forecast, anomalies, recommendations, hazards });
+    } catch (e) {
+      setError(e.message + ". Check that the backend is running and the intelligence API is available.");
+    } finally {
+      setLoading(false);
+    }
+  }, [horizon]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const risks = data.risks?.results || [];
+  const forecasts = data.forecast?.results || [];
+  const anomalies = data.anomalies?.results || [];
+  const recommendations = data.recommendations?.results || [];
+  const hazards = data.hazards?.results || [];
+  const average = risks.length
+    ? Math.round(risks.reduce((sum, item) => sum + item.risk_score, 0) / risks.length)
+    : 0;
+  const highRisk = risks.filter(item => item.risk_score >= 50).length;
+
+  return <main className="pi-dashboard">
+    <header className="pi-header">
+      <div>
+        <a className="pi-home-link" href="#">← Main dashboard</a>
+        <span className="pi-eyebrow"><Brain size={15}/> URBAN RIPPLE INTELLIGENCE</span>
+        <h1>Predictive Intelligence</h1>
+        <p>City disruption risks, forecast scenarios and response recommendations.</p>
+      </div>
+      <button className="pi-refresh" onClick={refresh} disabled={loading}>
+        <RefreshCw size={16}/> {loading ? "Refreshing..." : "Refresh data"}
+      </button>
+    </header>
+
+    {error && <div className="pi-error"><AlertTriangle size={18}/>{error}</div>}
+
+    {loading && !data.risks ? <div className="pi-loading">Loading intelligence data...</div> :
+    <>
+      <section className="pi-metrics">
+        <Metric title="Disruptions analysed" value={risks.length} caption="Database records" icon={Activity}/>
+        <Metric title="Average risk score" value={`${average}/100`} caption="Heuristic baseline" icon={TrendingUp}/>
+        <Metric title="High-risk incidents" value={highRisk} caption="Score 50 or above" icon={ShieldAlert}/>
+        <Metric title="Anomalies detected" value={anomalies.length} caption="Rule-based screening" icon={AlertTriangle}/>
+      </section>
+
+      <section className="pi-section">
+        <div className="pi-section-title"><ShieldAlert/><div><h2>Location risk assessment</h2><p>Ranked disruption risk scores</p></div></div>
+        {risks.length ? <div className="pi-table-wrap"><table className="pi-table">
+          <thead><tr><th>Disruption</th><th>Location</th><th>Type</th><th>Risk</th><th>Score</th></tr></thead>
+          <tbody>{risks.map(item => <tr key={item.disruption_id}>
+            <td>{item.title}</td><td><MapPin size={13}/> {item.location}</td>
+            <td>{item.disruption_type}</td>
+            <td><span className="pi-level" style={{color:scoreColor(item.risk_score)}}>{item.risk_level}</span></td>
+            <td><div className="pi-score"><span>{item.risk_score}</span><div><i style={{width:`${item.risk_score}%`,background:scoreColor(item.risk_score)}}/></div></div></td>
+          </tr>)}</tbody>
+        </table></div> : <p className="pi-empty">No disruption records available yet.</p>}
+      </section>
+
+      <section className="pi-section">
+        <div className="pi-section-title"><Clock/><div><h2>Impact forecast</h2><p>Scenario projection based on current disruption records</p></div></div>
+        <div className="pi-horizons">
+          {[6,24,48].map(value => <button key={value} className={horizon===value?"active":""} onClick={()=>setHorizon(value)}>{value} hours</button>)}
+        </div>
+        {forecasts.map(item => <div className="pi-forecast" key={item.disruption_id}>
+          <div><strong>{item.title}</strong><small>{item.location}</small></div>
+          <div className="pi-forecast-score">{item.baseline_risk} → <b style={{color:scoreColor(item.projected_risk)}}>{item.projected_risk}</b></div>
+        </div>)}
+        <p className="pi-disclaimer">{data.forecast?.method}</p>
+      </section>
+
+      <section className="pi-two-column">
+        <article className="pi-section">
+          <div className="pi-section-title"><AlertTriangle/><div><h2>Anomaly detection</h2><p>Unusual incident characteristics</p></div></div>
+          {anomalies.length ? anomalies.map(item=><div className="pi-item" key={item.disruption_id}>
+            <strong>{item.title}</strong><small>{item.location}</small>
+            {item.reasons.map((reason,i)=><p key={i}>{reason}</p>)}
+          </div>) : <p className="pi-empty">No anomalies detected.</p>}
+        </article>
+        <article className="pi-section">
+          <div className="pi-section-title"><Lightbulb/><div><h2>Response recommendations</h2><p>Prioritized suggested actions</p></div></div>
+          {recommendations.length ? recommendations.slice(0,8).map(item=><div className="pi-item" key={item.disruption_id}>
+            <strong>{item.title}</strong><small>Risk score: {item.risk_score}</small>
+            {item.recommendations.map((r,i)=><p key={i}><b>{r.priority}:</b> {r.action}</p>)}
+          </div>) : <p className="pi-empty">No recommendations available.</p>}
+        </article>
+      </section>
+
+      <section className="pi-section">
+        <div className="pi-section-title"><Activity/><div><h2>Multi-hazard screening</h2><p>Multiple disruption types recorded at the same location</p></div></div>
+        {hazards.length ? hazards.map((item,i)=><div className="pi-forecast" key={i}>
+          <div><strong>{item.location}</strong><small>{item.hazard_types.join(" · ")}</small></div>
+          <div><b>{item.combined_exposure_score}/100</b><small>{item.incident_count} incidents</small></div>
+        </div>) : <p className="pi-empty">No location-level hazard records available.</p>}
+      </section>
+      <p className="pi-disclaimer">Decision-support prototype. Scores and forecasts are heuristic estimates, not validated real-world predictions. Verify information with responsible city authorities.</p>
+    </>}
+  </main>;
+}
+
+========== BACKEND DATABASE CONFIGURATION ==========
+
+========== backend/main.py ==========
+from analytics.routes import router as analytics_router
+from disruption_management.routes import router as management_router
+from intelligence.predictions import router as intelligence_router
+from security.auth import router as auth_router
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from typing import Literal
+from datetime import datetime, timezone
+from uuid import uuid4
+import sqlite3
+from emergency.routes import router as emergency_router
+
+app = FastAPI(
+    title="URBAN RIPPLE API",
+    description="City Disruption Impact Prediction System",
+    version="1.0.0"
+)
+
+app.include_router(emergency_router)
+app.include_router(intelligence_router)
+
+app.include_router(auth_router)
+app.include_router(management_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Permanent SQLite database
+DATABASE = "urban_ripple.db"
+
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS disruptions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                disruption_type TEXT NOT NULL,
+                location TEXT NOT NULL,
+                latitude REAL,
+                longitude REAL,
+                duration_hours REAL NOT NULL,
+                affected_population INTEGER NOT NULL,
+                severity TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL
+            )
+        """)
+
+def row_to_dict(row):
+    return dict(row) if row else None
+
+init_db()
+
+
+class DisruptionCreate(BaseModel):
+    title: str = Field(min_length=3, max_length=150)
+    disruption_type: Literal[
+        "Road Closure", "Water Outage", "Power Outage"
+    ]
+    location: str = Field(min_length=2, max_length=200)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    duration_hours: float = Field(gt=0, le=720)
+    affected_population: int = Field(ge=0)
+    severity: Literal["Low", "Medium", "High", "Critical"]
+
+
+class ImpactRequest(BaseModel):
+    disruption_type: Literal[
+        "Road Closure", "Water Outage", "Power Outage"
+    ]
+    duration_hours: float = Field(gt=0, le=720)
+    affected_population: int = Field(ge=0)
+    severity: Literal["Low", "Medium", "High", "Critical"]
+
+
+@app.get("/")
+def home():
+    return {
+        "project": "URBAN RIPPLE",
+        "status": "Backend running",
+        "version": "1.0.0"
+    }
+
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+
+@app.get("/api/disruptions")
+def get_disruptions():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM disruptions ORDER BY created_at DESC"
+        ).fetchall()
+    records = [row_to_dict(row) for row in rows]
+    return {"count": len(records), "disruptions": records}
+
+@app.post("/api/disruptions", status_code=201)
+def create_disruption(data: DisruptionCreate):
+    record = data.model_dump()
+    record["id"] = str(uuid4())
+    record["created_at"] = datetime.now(timezone.utc).isoformat()
+    record["status"] = "Active"
+
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO disruptions (
+                id, title, disruption_type, location, latitude,
+                longitude, duration_hours, affected_population,
+                severity, created_at, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            record["id"], record["title"], record["disruption_type"],
+            record["location"], record["latitude"], record["longitude"],
+            record["duration_hours"], record["affected_population"],
+            record["severity"], record["created_at"], record["status"]
+        ))
+
+    return {
+        "message": "Disruption registered successfully",
+        "disruption": record
+    }
+
+@app.get("/api/disruptions/{disruption_id}")
+def get_disruption(disruption_id: str):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM disruptions WHERE id = ?",
+            (disruption_id,)
+        ).fetchone()
+
+    record = row_to_dict(row)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Disruption not found")
+    return record
+
+@app.post("/api/impact/analyze")
+def analyze_impact(data: ImpactRequest):
+    # Transparent demonstration formula, not a trained prediction model.
+    severity_weights = {
+        "Low": 1,
+        "Medium": 2,
+        "High": 3,
+        "Critical": 4
+    }
+
+    type_weights = {
+        "Road Closure": 1.0,
+        "Water Outage": 1.3,
+        "Power Outage": 1.5
+    }
+
+    raw_score = (
+        data.affected_population
+        * min(data.duration_hours, 72)
+        * severity_weights[data.severity]
+        * type_weights[data.disruption_type]
+    )
+
+    impact_score = round(
+        min(100, raw_score / 10000 * 100), 1
+    )
+
+    if impact_score < 25:
+        impact_level = "Low"
+    elif impact_score < 50:
+        impact_level = "Moderate"
+    elif impact_score < 75:
+        impact_level = "High"
+    else:
+        impact_level = "Severe"
+
+    recommendations = []
+
+    if data.severity in ["High", "Critical"]:
+        recommendations.append(
+            "Prioritise the disruption for immediate review by city authorities."
+        )
+
+    if data.affected_population >= 1000:
+        recommendations.append(
+            "Notify affected residents and coordinate alternative services."
+        )
+
+    if data.duration_hours >= 4:
+        recommendations.append(
+            "Prepare a continuity plan and provide periodic public updates."
+        )
+
+    if data.disruption_type == "Road Closure":
+        recommendations.append(
+            "Identify alternate routes and coordinate traffic management."
+        )
+    elif data.disruption_type == "Water Outage":
+        recommendations.append(
+            "Assess backup water supply and prioritise essential facilities."
+        )
+    elif data.disruption_type == "Power Outage":
+        recommendations.append(
+            "Prioritise critical infrastructure and assess backup power."
+        )
+
+    if not recommendations:
+        recommendations.append(
+            "Monitor the disruption and review conditions periodically."
+        )
+
+    return {
+        "impact_score": impact_score,
+        "impact_level": impact_level,
+        "disruption_type": data.disruption_type,
+        "duration_hours": data.duration_hours,
+        "affected_population": data.affected_population,
+        "severity": data.severity,
+        "recommendations": recommendations,
+        "method": "Demonstration rule-based formula",
+        "is_sap_rpt_prediction": False,
+        "notice": (
+            "This is a preliminary demonstration estimate, "
+            "not a validated prediction or SAP-RPT output."
+        )
+    }
+
+app.include_router(analytics_router)
+
+========== backend/security/auth.py ==========
+import os
+import sqlite3
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+
+import jwt
+from dotenv import load_dotenv
+from pwdlib import PasswordHash
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr, Field
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+DB_PATH = BASE_DIR / "urban_ripple.db"
+
+load_dotenv(BASE_DIR / ".env")
+
+SECRET_KEY = os.getenv("JWT_SECRET")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET is missing from backend/.env")
+
+password_hash = PasswordHash.recommended()
+security = HTTPBearer()
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_users_table():
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'public',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+
+init_users_table()
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+def create_token(user_id: int, email: str, role: str):
+    expiry = datetime.now(timezone.utc) + timedelta(hours=8)
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "role": role,
+        "exp": expiry
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        user_id = int(payload["sub"])
+    except (jwt.InvalidTokenError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    with get_connection() as conn:
+        user = conn.execute(
+            "SELECT id, name, email, role FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return dict(user)
+
+
+@router.post("/register", status_code=201)
+def register(data: RegisterRequest):
+    email = str(data.email).lower().strip()
+    hashed = password_hash.hash(data.password)
+
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute("""
+                INSERT INTO users (name, email, password_hash, role, created_at)
+                VALUES (?, ?, ?, 'public', ?)
+            """, (
+                data.name.strip(),
+                email,
+                hashed,
+                datetime.now(timezone.utc).isoformat()
+            ))
+            user_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    return {
+        "message": "Registration successful",
+        "user": {
+            "id": user_id,
+            "name": data.name.strip(),
+            "email": email,
+            "role": "public"
+        }
+    }
+
+
+@router.post("/login")
+def login(data: LoginRequest):
+    email = str(data.email).lower().strip()
+
+    with get_connection() as conn:
+        user = conn.execute(
+            "SELECT * FROM users WHERE email = ?",
+            (email,)
+        ).fetchone()
+
+    if user is None or not password_hash.verify(
+        data.password, user["password_hash"]
+    ):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_token(user["id"], user["email"], user["role"])
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "role": user["role"]
+        }
+    }
+
+
+@router.get("/me")
+def my_profile(user: dict = Depends(get_current_user)):
+    return {"user": user}
+
+========== backend/analytics/service.py ==========
+import sqlite3
+from pathlib import Path
+
+DB_PATH = Path(__file__).resolve().parents[1] / "urban_ripple.db"
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_analytics(start_date=None, end_date=None):
+    conditions = []
+    params = []
+
+    if start_date:
+        conditions.append("date(created_at) >= date(?)")
+        params.append(start_date)
+
+    if end_date:
+        conditions.append("date(created_at) <= date(?)")
+        params.append(end_date)
+
+    where_clause = (
+        " WHERE " + " AND ".join(conditions)
+        if conditions else ""
+    )
+
+    with get_connection() as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM disruptions{where_clause}",
+            params
+        ).fetchone()[0]
+
+        severity = conn.execute(
+            f"""
+            SELECT severity, COUNT(*) AS count
+            FROM disruptions
+            {where_clause}
+            GROUP BY severity
+            """,
+            params
+        ).fetchall()
+
+        types = conn.execute(
+            f"""
+            SELECT disruption_type, COUNT(*) AS count
+            FROM disruptions
+            {where_clause}
+            GROUP BY disruption_type
+            ORDER BY count DESC
+            """,
+            params
+        ).fetchall()
+
+        locations = conn.execute(
+            f"""
+            SELECT location, COUNT(*) AS count,
+                   SUM(affected_population) AS affected_population
+            FROM disruptions
+            {where_clause}
+            GROUP BY location
+            ORDER BY affected_population DESC
+            """,
+            params
+        ).fetchall()
+
+        population = conn.execute(
+            f"""
+            SELECT COALESCE(SUM(affected_population), 0)
+            FROM disruptions
+            {where_clause}
+            """,
+            params
+        ).fetchone()[0]
+
+
+        risk_summary = conn.execute(
+            f"""
+            SELECT
+                SUM(CASE WHEN lower(severity) = 'critical' THEN 1 ELSE 0 END) AS critical,
+                SUM(CASE WHEN lower(severity) = 'high' THEN 1 ELSE 0 END) AS high,
+                SUM(CASE WHEN lower(severity) IN ('high', 'critical') THEN 1 ELSE 0 END) AS high_risk,
+                SUM(CASE WHEN lower(severity) IN ('high', 'critical')
+                    THEN COALESCE(affected_population, 0) ELSE 0 END) AS high_risk_population
+            FROM disruptions
+            {where_clause}
+            """,
+            params
+        ).fetchone()
+
+        monthly = conn.execute(
+            f"""
+            SELECT strftime('%Y-%m', created_at) AS month,
+                   COUNT(*) AS count
+            FROM disruptions
+            {where_clause}
+            GROUP BY month
+            ORDER BY month
+            """,
+            params
+        ).fetchall()
+
+    return {
+        "total_disruptions": total,
+        "affected_population": population,
+        "severity_distribution": [dict(row) for row in severity],
+        "disruption_types": [dict(row) for row in types],
+        "location_impact": [dict(row) for row in locations],
+        "monthly_trend": [dict(row) for row in monthly],
+        "risk_summary": dict(risk_summary),
+        "filters": {
+            "start_date": start_date,
+            "end_date": end_date
+        }
+    }
+
+========== ENVIRONMENT VARIABLE NAMES ONLY ==========
+VITE_API_URL=http://127.0.0.1:8000
+
+========== DATABASE FILE INFORMATION ==========
+-rw-r--r--@ 1 apple  staff    32K  1 Nov 11:16 backend/urban_ripple.db
+
+========== FRONTEND ENTRY AND ROUTING ==========
+
+========== frontend/src/main.jsx ==========
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import "./modules/auth/Auth.css";
+import AppRouter from "./AppRouter.jsx";
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <AppRouter />
+  </StrictMode>
+);
+
+========== frontend/src/AppRouter.jsx ==========
+import { useEffect, useState } from "react";
+import App from "./App.jsx";
+import AuthScreen from "./auth/AuthScreen.jsx";
+import RolePortal from "./portals/RolePortal.jsx";
+
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+export default function AppRouter() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifySession() {
+      const token = localStorage.getItem("urban_ripple_token");
+
+      if (!token) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Session expired");
+
+        const data = await response.json();
+        if (active) setUser(data.user);
+      } catch {
+        localStorage.removeItem("urban_ripple_token");
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    verifySession();
+    return () => { active = false; };
+  }, []);
+
+  function logout() {
+    localStorage.removeItem("urban_ripple_token");
+    setUser(null);
+    setWorkspace(false);
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40, fontFamily: "Arial" }}>Verifying session...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={setUser} />;
+  }
+
+  if (!workspace) {
+    return (
+      <RolePortal
+        user={user}
+        onOpenWorkspace={() => setWorkspace(true)}
+        onLogout={logout}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        padding: "10px 20px",
+        background: "#f1f1fa",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <span>Signed in: {user.name} ({user.role})</span>
+        <button onClick={() => setWorkspace(false)}>Portal</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+      <App />
+    </div>
+  );
+}
